@@ -77,9 +77,10 @@ class WebUtils:
             netkb_file = self.shared_data.netkbfile
             with open(netkb_file, 'r', encoding='utf-8') as file:
                 reader = csv.DictReader(file)
-                data = [row for row in reader if row['Alive'] == '1']
+                fieldnames = reader.fieldnames or []
+                data = [row for row in reader if row.get('Alive') == '1']
 
-            actions = reader.fieldnames[5:]  # Actions are all fields after 'Ports'
+            actions = fieldnames[5:] if fieldnames else []
             response_data = {
                 'ips': [row['IPs'] for row in data],
                 'ports': {row['IPs']: row['Ports'].split(';') for row in data},
