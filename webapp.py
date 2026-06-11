@@ -99,6 +99,11 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             self.web_utils.serve_netkb_data(self)
         elif self.path == '/netkb_data_json':
             self.web_utils.serve_netkb_data_json(self)
+        elif self.path == '/csrf_token':
+            self.send_response(200)
+            self.send_header("Content-type", "application/json")
+            self.end_headers()
+            self.wfile.write(json.dumps({"csrf_token": self.shared_data.csrf_token}).encode('utf-8'))
         elif self.path.startswith('/screen.png'):
             self.web_utils.serve_image(self)
         elif self.path == '/favicon.ico':
@@ -121,6 +126,14 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             super().do_GET()
 
     def do_POST(self):
+        csrf_token = self.headers.get('X-CSRF-Token', '')
+        if csrf_token != self.shared_data.csrf_token:
+            self.send_response(403)
+            self.send_header("Content-type", "application/json")
+            self.end_headers()
+            self.wfile.write(json.dumps({"status": "error", "message": "CSRF token missing or invalid"}).encode('utf-8'))
+            return
+
         # Handle POST requests for saving configuration, connecting to Wi-Fi, clearing files, rebooting, and shutting down.
         if self.path == '/save_config':
             self.web_utils.save_configuration(self)

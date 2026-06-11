@@ -97,21 +97,17 @@ function generateConfigForm(config) {
     
         console.log("Form data:", formDataObj);
     
-        const xhr = new XMLHttpRequest();
-        xhr.open("POST", "/save_config", true);
-        xhr.setRequestHeader("Content-Type", "application/json;charset=UTF-8");
-        xhr.onreadystatechange = function () {
-            if (xhr.readyState == 4) {
-                console.log("Response status: " + xhr.status);
-                if (xhr.status == 200) {
-                    loadConfig();
-                } else {
-                    console.error("Failed to save configuration");
-                    alert("Failed to save configuration");
-                }
+        csrfPost('/save_config', {
+            headers: { 'Content-Type': 'application/json;charset=UTF-8' },
+            body: JSON.stringify(formDataObj)
+        }).then(response => {
+            if (response.ok) {
+                loadConfig();
+            } else {
+                console.error("Failed to save configuration");
+                alert("Failed to save configuration");
             }
-        };
-        xhr.send(JSON.stringify(formDataObj));
+        });
     }
     
     function restoreDefault() {
@@ -182,8 +178,7 @@ function generateConfigForm(config) {
     function connectWifi(ssid) {
         let password = prompt("Enter the password for " + ssid);
         if (password) {
-            fetch('/connect_wifi', {
-                method: 'POST',
+            csrfPost('/connect_wifi', {
                 headers: {
                     'Content-Type': 'application/json',
                 },

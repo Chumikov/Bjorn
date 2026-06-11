@@ -181,42 +181,42 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
 function clear_files() {
-    fetch('/clear_files', { method: 'POST' })
+    csrfPost('/clear_files')
         .then(response => response.json())
         .then(data => alert(data.message))
         .catch(error => alert('Failed to clear files: ' + error.message));
 }
 
 function clear_files_light() {
-    fetch('/clear_files_light', { method: 'POST' })
+    csrfPost('/clear_files_light')
         .then(response => response.json())
         .then(data => alert(data.message))
         .catch(error => alert('Failed to clear files: ' + error.message));
 }
 
 function reboot_system() {
-    fetch('/reboot', { method: 'POST' })
+    csrfPost('/reboot')
         .then(response => response.json())
         .then(data => alert(data.message))
         .catch(error => alert('Failed to reboot: ' + error.message));
 }
 
 function shutdown_system() {
-    fetch('/shutdown', { method: 'POST' })
+    csrfPost('/shutdown')
         .then(response => response.json())
         .then(data => alert(data.message))
         .catch(error => alert('Failed to shutdown: ' + error.message));
 }
 
 function restart_bjorn_service() {
-    fetch('/restart_bjorn_service', { method: 'POST' })
+    csrfPost('/restart_bjorn_service')
         .then(response => response.json())
         .then(data => alert(data.message))
         .catch(error => alert('Failed to restart service: ' + error.message));
 }
 
 function backup_data() {
-    fetch('/backup', { method: 'POST' })
+    csrfPost('/backup')
         .then(response => response.json())
         .then(data => {
             if (data.status === 'success') {
@@ -241,8 +241,7 @@ function restore_data() {
         const formData = new FormData();
         formData.append('file', file);
 
-        fetch('/restore', {
-            method: 'POST',
+        csrfPost('/restore', {
             body: formData
         })
         .then(response => response.json())
@@ -253,28 +252,28 @@ function restore_data() {
 }
 
 function stop_orchestrator() {
-    fetch('/stop_orchestrator', { method: 'POST' })
+    csrfPost('/stop_orchestrator')
         .then(response => response.json())
         .then(data => alert(data.message))
         .catch(error => alert('Failed to stop orchestrator: ' + error.message));
 }
 
 function start_orchestrator() {
-    fetch('/start_orchestrator', { method: 'POST' })
+    csrfPost('/start_orchestrator')
         .then(response => response.json())
         .then(data => alert(data.message))
         .catch(error => alert('Failed to start orchestrator: ' + error.message));
 }
 
 function disconnect_wifi() {
-    fetch('/disconnect_wifi', { method: 'POST' })
+    csrfPost('/disconnect_wifi')
         .then(response => response.json())
         .then(data => alert(data.message))
         .catch(error => alert('Failed to disconnect: ' + error.message));
 }
 
 function initialize_csv() {
-    fetch('/initialize_csv', { method: 'POST' })
+    csrfPost('/initialize_csv')
         .then(response => response.json())
         .then(data => alert(data.message))
         .catch(error => alert('Failed to initialize CSV: ' + error.message));

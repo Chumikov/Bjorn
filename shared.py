@@ -21,6 +21,7 @@ import time
 import csv
 import logging
 import subprocess
+import uuid
 from PIL import Image, ImageFont 
 from logger import Logger
 from epd_helper import EPDHelper
@@ -112,6 +113,7 @@ class SharedData:
         self.rdpfile = os.path.join(self.crackedpwddir, "rdp.csv")
         #Files directly under logsdir
         self.webconsolelog = os.path.join(self.logsdir, 'temp_log.txt')
+        self.csrf_token = str(uuid.uuid4())
 
     def get_default_config(self):
         """ The configuration below is used to set the default values of the configuration settings."""

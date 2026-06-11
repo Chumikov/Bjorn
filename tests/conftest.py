@@ -53,6 +53,7 @@ def mock_shared_data(monkeypatch):
     shared_mock.version = "test"
     shared_mock.config = {"websrv": True}
     shared_mock.web_delay = 2
+    shared_mock.csrf_token = "test-csrf-token-12345"
 
     mock_module = MagicMock()
     mock_module.shared_data = shared_mock

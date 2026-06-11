@@ -8,6 +8,7 @@
     <link rel="stylesheet" href="web/css/styles.css">
     <link rel="manifest" href="manifest.json">
     <link rel="apple-touch-icon" href="images/apple-touch-icon.png">
+    <script src="web/scripts/csrf.js" defer></script>
     <script src="web/scripts/config.js" defer></script>
     <script>fetch('/version').then(r=>r.json()).then(d=>{document.title='Bjorn v'+d.version+' - Config';});</script>
 </head>
