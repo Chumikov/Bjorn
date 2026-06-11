@@ -616,6 +616,8 @@ class SharedData:
                 line = ''
                 while words and font.getlength(line + words[0]) <= max_width:
                     line = line + (words.pop(0) + ' ')
+                if not line and words:
+                    line = words.pop(0) + ' '
                 lines.append(line)
             return lines
         except Exception as e:
