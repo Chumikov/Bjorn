@@ -3,7 +3,7 @@ steal_files_telnet.py - This script connects to remote Telnet servers using prov
 """
 
 import os
-import telnetlib
+import telnet_shim as telnetlib
 import logging
 import time
 from rich.console import Console
