@@ -8,8 +8,6 @@ import json
 import csv
 import zipfile
 import uuid
-import cgi
-import io
 import importlib
 import glob
 import logging
@@ -234,17 +232,40 @@ class WebUtils:
             handler.end_headers()
             handler.wfile.write(json.dumps({"status": "error", "message": str(e)}).encode('utf-8'))
 
+    def _parse_multipart(self, raw_data, headers):
+        content_type = headers.get('Content-Type', '')
+        if 'boundary=' not in content_type:
+            return None, None
+        boundary = content_type.split('boundary=')[1].strip().encode()
+        parts = raw_data.split(b'--' + boundary)
+        for part in parts:
+            if b'filename=' not in part:
+                continue
+            try:
+                header_end = part.find(b'\r\n\r\n')
+                if header_end < 0:
+                    continue
+                header = part[:header_end].decode('utf-8', errors='replace')
+                filename = header.split('filename="')[1].split('"')[0]
+                content = part[header_end + 4:]
+                content = content.rstrip(b'\r\n')
+                if content.endswith(b'--'):
+                    content = content[:-2]
+                return filename, content
+            except (IndexError, ValueError):
+                continue
+        return None, None
+
     def restore(self, handler):
         try:
             content_length = int(handler.headers['Content-Length'])
             field_data = handler.rfile.read(content_length)
-            field_storage = cgi.FieldStorage(fp=io.BytesIO(field_data), headers=handler.headers, environ={'REQUEST_METHOD': 'POST'})
+            filename, file_content = self._parse_multipart(field_data, handler.headers)
 
-            file_item = field_storage['file']
-            if file_item.filename:
-                backup_path = os.path.join(self.shared_data.upload_dir, file_item.filename)
+            if filename and file_content is not None:
+                backup_path = os.path.join(self.shared_data.upload_dir, filename)
                 with open(backup_path, 'wb') as output_file:
-                    output_file.write(file_item.file.read())
+                    output_file.write(file_content)
 
                 with zipfile.ZipFile(backup_path, 'r') as backup_zip:
                     backup_zip.extractall(self.shared_data.currentdir)

@@ -67,9 +67,16 @@ class TestMultipartParser:
         mock_shared_data.upload_dir = str(tmp_path)
         mock_shared_data.currentdir = str(tmp_path)
 
+        import zipfile
+        zip_path = os.path.join(str(tmp_path), "test.zip")
+        with zipfile.ZipFile(zip_path, 'w') as zf:
+            zf.writestr("test.txt", "hello")
+        with open(zip_path, 'rb') as f:
+            real_zip_content = f.read()
+
         web_utils = self._make_web_utils(mock_shared_data)
 
-        body, headers = self._build_multipart("test.zip", b"PK\x03\x04fake")
+        body, headers = self._build_multipart("test.zip", real_zip_content)
         mock_handler.headers = headers
         mock_handler.rfile = MagicMock()
         mock_handler.rfile.read.return_value = body
@@ -79,5 +86,5 @@ class TestMultipartParser:
         assert mock_handler.response_code == 200, f"Expected 200, got {mock_handler.response_code}"
         saved = os.path.join(str(tmp_path), "test.zip")
         assert os.path.exists(saved), "Uploaded file should be saved"
-        with open(saved, 'rb') as f:
-            assert f.read() == b"PK\x03\x04fake"
+        restored_file = os.path.join(str(tmp_path), "test.txt")
+        assert os.path.exists(restored_file), "Zip should have been extracted"
