@@ -123,6 +123,9 @@ class RDPConnector:
     def run_bruteforce(self, adresse_ip, port):
         self.load_scan_file()  # Reload the scan file to get the latest IPs and ports
 
+        mac_address = self.scan.loc[self.scan['IPs'] == adresse_ip, 'MAC Address'].values[0]
+        hostname = self.scan.loc[self.scan['IPs'] == adresse_ip, 'Hostnames'].values[0]
+
         total_tasks = len(self.users) * len(self.passwords)
         
         for user in self.users:
@@ -137,9 +140,6 @@ class RDPConnector:
 
         with Progress(SpinnerColumn(), TextColumn("[progress.description]{task.description}"), BarColumn(), TextColumn("[progress.percentage]{task.percentage:>3.0f}%")) as progress:
             task_id = progress.add_task("[cyan]Bruteforcing RDP...", total=total_tasks)
-
-            mac_address = self.scan.loc[self.scan['IPs'] == adresse_ip, 'MAC Address'].values[0]
-            hostname = self.scan.loc[self.scan['IPs'] == adresse_ip, 'Hostnames'].values[0]
 
             for _ in range(40):  # Adjust the number of threads based on the RPi Zero's capabilities
                 t = threading.Thread(target=self.worker, args=(progress, task_id, success_flag))
