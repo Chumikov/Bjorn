@@ -11,39 +11,39 @@ function generateConfigForm(config) {
     
     for (const [key, value] of Object.entries(config)) {
         if (key.startsWith("__title_")) {
-            rightColumn.innerHTML += `<div class="section-title"><b>${value}</b></div>`;
+            rightColumn.innerHTML += `<div class="section-title"><b>${escapeHtml(value)}</b></div>`;
         } else if (typeof value === "boolean") {
             const checked = value ? "checked" : "";
             leftColumn.innerHTML += `
     
                 <div class="label-switch">
                     <label class="switch">
-                        <input type="checkbox" id="${key}" name="${key}" ${checked}>
+                        <input type="checkbox" id="${escapeHtml(key)}" name="${escapeHtml(key)}" ${checked}>
                         <span class="slider round"></span>
                     </label>
-                    <label for="${key}">${key}</label>
+                    <label for="${escapeHtml(key)}">${escapeHtml(key)}</label>
                 </div>
             `;
         } else if (Array.isArray(value)) {
-            const listValue = value.join(',');
+            const listValue = escapeHtml(value.join(','));
             rightColumn.innerHTML += `
                 <div class="section-item">
-                    <label for="${key}">${key}:</label>
-                    <input type="text" id="${key}" name="${key}" value="${listValue}">
+                    <label for="${escapeHtml(key)}">${escapeHtml(key)}:</label>
+                    <input type="text" id="${escapeHtml(key)}" name="${escapeHtml(key)}" value="${listValue}">
                 </div>
             `;
         } else if (!isNaN(value) && !key.toLowerCase().includes("ip") && !key.toLowerCase().includes("mac")) {
             rightColumn.innerHTML += `
                 <div class="section-item">
-                    <label for="${key}">${key}:</label>
-                    <input type="number" id="${key}" name="${key}" value="${value}">
+                    <label for="${escapeHtml(key)}">${escapeHtml(key)}:</label>
+                    <input type="number" id="${escapeHtml(key)}" name="${escapeHtml(key)}" value="${escapeHtml(String(value))}">
                 </div>
             `;
         } else {
             rightColumn.innerHTML += `
                 <div class="section-item">
-                    <label for="${key}">${key}:</label>
-                    <input type="text" id="${key}" name="${key}" value="${value}">
+                    <label for="${escapeHtml(key)}">${escapeHtml(key)}:</label>
+                    <input type="text" id="${escapeHtml(key)}" name="${escapeHtml(key)}" value="${escapeHtml(String(value))}">
                 </div>
             `;
         }

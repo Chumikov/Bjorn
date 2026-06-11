@@ -78,6 +78,8 @@ class TestGenerateHtmlEscapesXSS:
         csv_file.write_text('IPs,MAC,Hostname,Alive,Ports\n"<b onmouseover=alert(1)>10.0.0.1</b>",aa:bb,host1,1,22\n')
 
         web_utils = self._make_web_utils(mock_shared_data)
-        html = web_utils.generate_html_table_netkb(str(csv_file))
+        result = web_utils.generate_html_table_netkb(str(csv_file))
 
-        assert "onmouseover" not in html, "Unescaped event handler in netkb"
+        assert "<b " not in result, "Unescaped <b> tag in netkb"
+        assert "</b>" not in result, "Unescaped </b> tag in netkb"
+        assert "&lt;b " in result, "Tag should be escaped"

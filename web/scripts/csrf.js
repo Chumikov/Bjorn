@@ -1,5 +1,14 @@
 let _csrfToken = null;
 
+function escapeHtml(str) {
+    if (typeof str !== 'string') return str;
+    return str.replace(/&/g, '&amp;')
+              .replace(/</g, '&lt;')
+              .replace(/>/g, '&gt;')
+              .replace(/"/g, '&quot;')
+              .replace(/'/g, '&#39;');
+}
+
 async function getCsrfToken() {
     if (!_csrfToken) {
         const resp = await fetch('/csrf_token');

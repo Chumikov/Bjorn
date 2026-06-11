@@ -89,8 +89,8 @@
                     const ipDropdown = document.getElementById('ip-dropdown');
                     const actionDropdown = document.getElementById('action-dropdown');
     
-                    ipDropdown.innerHTML = data.ips.map(ip => `<option value="${ip}">${ip}</option>`).join('');
-                    actionDropdown.innerHTML = data.actions.map(action => `<option value="${action}">${action}</option>`).join('');
+                    ipDropdown.innerHTML = data.ips.map(ip => `<option value="${escapeHtml(ip)}">${escapeHtml(ip)}</option>`).join('');
+                    actionDropdown.innerHTML = data.actions.map(action => `<option value="${escapeHtml(action)}">${escapeHtml(action)}</option>`).join('');
                 })
                 .catch(error => console.error('Error loading netkb data:', error));
         }
@@ -103,7 +103,7 @@
                 .then(response => response.json())
                 .then(data => {
                     const portDropdown = document.getElementById('port-dropdown');
-                    portDropdown.innerHTML = data.ports[selectedIp].map(port => `<option value="${port}">${port}</option>`).join('');
+                    portDropdown.innerHTML = data.ports[selectedIp].map(port => `<option value="${escapeHtml(port)}">${escapeHtml(port)}</option>`).join('');
                 })
                 .catch(error => console.error('Error updating ports:', error));
         }
@@ -137,7 +137,7 @@
                 .then(response => response.text())
                 .then(data => {
                     const logConsole = document.getElementById('log-console');
-                    logConsole.innerHTML = `<pre>${data}</pre>`;
+                    logConsole.textContent = data;
                 })
                 .catch(error => console.error('Error loading recent logs:', error));
         }

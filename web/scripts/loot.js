@@ -23,7 +23,7 @@ function generateFileListHTML(files, path, indent) {
             html += `
                 <li style="margin-left: ${indent * 5}px;">
                     <img src="${icon}" alt="Folder Icon" style="height: 20px;">
-                    <strong>${file.name}</strong>
+                    <strong>${escapeHtml(file.name)}</strong>
                     <ul>
                         ${generateFileListHTML(file.children || [], `${path}/${file.name}`, indent + 1)}
                     </ul>
@@ -33,7 +33,7 @@ function generateFileListHTML(files, path, indent) {
             html += `
                 <li style="margin-left: ${indent * 5}px;">
                     <img src="${icon}" alt="File Icon" style="height: 20px;">
-                    <a href="/download_file?path=${encodeURIComponent(file.path)}">${file.name}</a>
+                    <a href="/download_file?path=${encodeURIComponent(file.path)}">${escapeHtml(file.name)}</a>
                 </li>`;
         }
     });

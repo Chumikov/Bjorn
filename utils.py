@@ -3,6 +3,7 @@
 import json
 import subprocess
 import os
+import html
 import json
 import csv
 import zipfile
@@ -308,26 +309,26 @@ class WebUtils:
             handler.wfile.write(json.dumps({"status": "error", "message": str(e)}).encode('utf-8'))
 
     def generate_html_for_csv_files(self, directory):
-        html = '<div class="credentials-container">\n'
+        html_out = '<div class="credentials-container">\n'
         for filename in os.listdir(directory):
             if filename.endswith('.csv'):
                 filepath = os.path.join(directory, filename)
-                html += f'<h2>{filename}</h2>\n'
-                html += '<table class="styled-table">\n<thead>\n<tr>\n'
+                html_out += f'<h2>{html.escape(filename)}</h2>\n'
+                html_out += '<table class="styled-table">\n<thead>\n<tr>\n'
                 with open(filepath, 'r') as file:
                     reader = csv.reader(file)
                     headers = next(reader)
                     for header in headers:
-                        html += f'<th>{header}</th>\n'
-                    html += '</tr>\n</thead>\n<tbody>\n'
+                        html_out += f'<th>{html.escape(header)}</th>\n'
+                    html_out += '</tr>\n</thead>\n<tbody>\n'
                     for row in reader:
-                        html += '<tr>\n'
+                        html_out += '<tr>\n'
                         for cell in row:
-                            html += f'<td>{cell}</td>\n'
-                        html += '</tr>\n'
-                html += '</tbody>\n</table>\n'
-        html += '</div>\n'
-        return html
+                            html_out += f'<td>{html.escape(cell)}</td>\n'
+                        html_out += '</tr>\n'
+                html_out += '</tbody>\n</table>\n'
+        html_out += '</div>\n'
+        return html_out
 
     def list_files(self, directory):
         files = []
@@ -645,13 +646,13 @@ class WebUtils:
             reader = csv.reader(file)
             headers = next(reader)
             for header in headers:
-                table_html += f'<th>{header}</th>'
+                table_html += f'<th>{html.escape(header)}</th>'
             table_html += '</tr></thead><tbody>'
             for row in reader:
                 table_html += '<tr>'
                 for cell in row:
                     cell_class = "green" if cell.strip() else "red"
-                    table_html += f'<td class="{cell_class}">{cell}</td>'
+                    table_html += f'<td class="{cell_class}">{html.escape(cell)}</td>'
                 table_html += '</tr>'
             table_html += '</tbody></table>'
         return table_html
@@ -663,7 +664,7 @@ class WebUtils:
                 reader = csv.reader(file)
                 headers = next(reader)
                 for header in headers:
-                    table_html += f'<th>{header}</th>'
+                    table_html += f'<th>{html.escape(header)}</th>'
                 table_html += '</tr></thead><tbody>'
                 for row in reader:
                     row_class = "blue-row" if '0' in row[3] else ""
@@ -676,7 +677,7 @@ class WebUtils:
                             cell_class = "red bold"
                         elif cell.strip() == "":
                             cell_class = "grey"
-                        table_html += f'<td class="{cell_class}">{cell}</td>'
+                        table_html += f'<td class="{cell_class}">{html.escape(cell)}</td>'
                     table_html += '</tr>'
                 table_html += '</tbody></table>'
         except Exception as e:

@@ -39,13 +39,12 @@ function fetchLogs() {
             const newContent = [];
 
             lines.forEach(line => {
-                let modifiedLine = line;
+                if (line.includes('==>') || line.includes('<==')) return;
+                let modifiedLine = escapeHtml(line);
                 const regexFile = /(\w+\.py)/g;
                 let matchFile;
                 while ((matchFile = regexFile.exec(line)) !== null) {
                     const fileName = matchFile[1];
-                    if (line.includes('==>') || line.includes('<==')) 
-                    return;
                     if (!fileColors.has(fileName)) {
                         fileColors.set(fileName, getRandomColor());
                     }
