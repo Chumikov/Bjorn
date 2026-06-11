@@ -1,80 +1,80 @@
-## 🔧 Installation and Configuration
+## 🔧 Установка и настройка
 
 <p align="center">
   <img src="https://github.com/user-attachments/assets/c5eb4cc1-0c3d-497d-9422-1614651a84ab" alt="thumbnail_IMG_0546" width="98">
 </p>
 
-## 📚 Table of Contents
+## 📚 Содержание
 
-- [Prerequisites](#-prerequisites)
-- [Quick Install](#-quick-install)
-- [Manual Install](#-manual-install)
-- [License](#-license)
+- [Предварительные требования](#-предварительные-требования)
+- [Быстрая установка](#-быстрая-установка)
+- [Ручная установка](#-ручная-установка)
+- [Лицензия](#-лицензия)
 
-Use Raspberry Pi Imager to install your OS
+Используйте Raspberry Pi Imager для установки ОС:
 https://www.raspberrypi.com/software/
 
-### 📌 Prerequisites for RPI zero W (32bits)
+### 📌 Предварительные требования для RPI zero W (32-бит)
 ![image](https://github.com/user-attachments/assets/3980ec5f-a8fc-4848-ab25-4356e0529639)
 
-- Raspberry Pi OS installed. 
-    - Stable:
-      - System: 32-bit
-      - Kernel version: 6.6
-      - Debian version: 12 (bookworm) '2024-10-22-raspios-bookworm-armhf-lite'
-- Username and hostname set to `bjorn`.
-- 2.13-inch e-Paper HAT connected to GPIO pins.
+- Установленная Raspberry Pi OS.
+    - Стабильная:
+      - Система: 32-бит
+      - Версия ядра: 6.6
+      - Версия Debian: 12 (bookworm) '2024-10-22-raspios-bookworm-armhf-lite'
+- Имя пользователя и hostname установлены в `bjorn`.
+- e-Paper HAT 2.13 дюйма подключён к GPIO-пинам.
 
-### 📌 Prerequisites for RPI zero W2 (64bits)
+### 📌 Предварительные требования для RPI zero W2 (64-бит)
 
 ![image](https://github.com/user-attachments/assets/e8d276be-4cb2-474d-a74d-b5b6704d22f5)
 
-I did not develop Bjorn for the raspberry pi zero w2 64bits, but several feedbacks have attested that the installation worked perfectly.
+Проект не разрабатывался специально для Raspberry Pi Zero W2 64-бит, но несколько отзывов подтвердили, что установка работает корректно.
 
-- Raspberry Pi OS installed. 
-    - Stable:
-      - System: 64-bit
-      - Kernel version: 6.6
-      - Debian version: 12 (bookworm) '2024-10-22-raspios-bookworm-arm64-lite'
-- Username and hostname set to `bjorn`.
-- 2.13-inch e-Paper HAT connected to GPIO pins.
+- Установленная Raspberry Pi OS.
+    - Стабильная:
+      - Система: 64-бит
+      - Версия ядра: 6.6
+      - Версия Debian: 12 (bookworm) '2024-10-22-raspios-bookworm-arm64-lite'
+- Имя пользователя и hostname установлены в `bjorn`.
+- e-Paper HAT 2.13 дюйма подключён к GPIO-пинам.
 
 
 
-At the moment the paper screen v2  v4 have been tested and implemented.
-I juste hope the V1 & V3 will work the same.
- 
-### ⚡ Quick Install
+На данный момент протестированы и поддерживаются экраны v2 и v4.
+Надеемся, что V1 и V3 также будут работать корректно.
 
-The fastest way to install Bjorn is using the automatic installation script :
+### ⚡ Быстрая установка
+
+Самый быстрый способ установить Bjorn — использовать скрипт автоматической установки:
 
 ```bash
-# Download and run the installer
+# Скачать и запустить установщик
 wget https://raw.githubusercontent.com/infinition/Bjorn/refs/heads/main/install_bjorn.sh
 sudo chmod +x install_bjorn.sh
 sudo ./install_bjorn.sh
-# Choose the choice 1 for automatic installation. It may take a while as a lot of packages and modules will be installed. You must reboot at the end.
+# Выберите вариант 1 для автоматической установки. Это может занять некоторое время, так как будет установлено множество пакетов и модулей. Необходимо выполнить перезагрузку по завершении.
 ```
 
-### 🧰 Manual Install
+### 🧰 Ручная установка
 
-#### Step 1: Activate SPI & I2C
+#### Шаг 1: Активация SPI и I2C
 
 ```bash
 sudo raspi-config
 ```
 
-- Navigate to **"Interface Options"**.
-- Enable **SPI**.
-- Enable **I2C**.
+- Перейдите в **"Interface Options"**.
+- Включите **SPI**.
+- Включите **I2C**.
 
-#### Step 2: System Dependencies
+#### Шаг 2: Системные зависимости
 
 ```bash
-# Update system
+# Обновление системы
 sudo apt-get update && sudo apt-get upgrade -y
 
-# Install required packages
+# Установка необходимых пакетов
 
  sudo apt install -y \
   libjpeg-dev \
@@ -101,57 +101,57 @@ sudo apt-get update && sudo apt-get upgrade -y
   python3-pil
 
 
-# Update Nmap scripts database
+# Обновление базы скриптов Nmap
 
 sudo nmap --script-updatedb
 
 ```
 
-#### Step 3: Bjorn Installation
+#### Шаг 3: Установка Bjorn
 
 ```bash
-# Clone the Bjorn repository
+# Клонирование репозитория Bjorn
 cd /home/bjorn
 git clone https://github.com/infinition/Bjorn.git
 cd Bjorn
 
-# Install Python dependencies within the virtual environment
+# Установка Python-зависимостей
 sudo pip install -r requirements.txt --break-system-packages
-# As i did not succeed "for now" to get a stable installation with a virtual environment, i installed the dependencies system wide (with --break-system-packages), it did not cause any issue so far. You can try to install them in a virtual environment if you want.
+# Поскольку пока не удалось получить стабильную установку в виртуальном окружении, зависимости установлены системно (с --break-system-packages). На данный момент это не вызывало проблем. Вы можете попробовать установить их в виртуальном окружении, если хотите.
 ```
 
-##### 3.1: Configure E-Paper Display Type
-Choose your e-Paper HAT version by modifying the configuration file:
+##### 3.1: Настройка типа e-Paper дисплея
+Выберите версию вашего e-Paper HAT, изменив файл конфигурации:
 
-1. Open the configuration file:
+1. Откройте файл конфигурации:
 ```bash
 sudo vi /home/bjorn/Bjorn/config/shared_config.json
 ```
-Press i to enter insert mode
-Locate the line containing "epd_type":
-Change the value according to your screen model:
+Нажмите `i` для входа в режим вставки
+Найдите строку, содержащую `"epd_type"`:
+Измените значение в соответствии с моделью вашего экрана:
 
-- For 2.13 V1: "epd_type": "epd2in13",
-- For 2.13 V2: "epd_type": "epd2in13_V2",
-- For 2.13 V3: "epd_type": "epd2in13_V3",
-- For 2.13 V4: "epd_type": "epd2in13_V4",
+- Для 2.13 V1: `"epd_type": "epd2in13"`,
+- Для 2.13 V2: `"epd_type": "epd2in13_V2"`,
+- Для 2.13 V3: `"epd_type": "epd2in13_V3"`,
+- Для 2.13 V4: `"epd_type": "epd2in13_V4"`,
 
-Press Esc to exit insert mode
-Type :wq and press Enter to save and quit
+Нажмите `Esc` для выхода из режима вставки
+Введите `:wq` и нажмите `Enter` для сохранения и выхода
 
-#### Step 4: Configure File Descriptor Limits
+#### Шаг 4: Настройка лимитов файловых дескрипторов
 
-To prevent `OSError: [Errno 24] Too many open files`, it's essential to increase the file descriptor limits.
+Для предотвращения ошибки `OSError: [Errno 24] Too many open files` необходимо увеличить лимиты файловых дескрипторов.
 
-##### 4.1: Modify File Descriptor Limits for All Users
+##### 4.1: Изменение лимитов файловых дескрипторов для всех пользователей
 
-Edit `/etc/security/limits.conf`:
+Отредактируйте `/etc/security/limits.conf`:
 
 ```bash
 sudo vi /etc/security/limits.conf
 ```
 
-Add the following lines:
+Добавьте следующие строки:
 
 ```
 * soft nofile 65535
@@ -160,103 +160,103 @@ root soft nofile 65535
 root hard nofile 65535
 ```
 
-##### 4.2: Configure Systemd Limits
+##### 4.2: Настройка лимитов Systemd
 
-Edit `/etc/systemd/system.conf`:
+Отредактируйте `/etc/systemd/system.conf`:
 
 ```bash
 sudo vi /etc/systemd/system.conf
 ```
 
-Uncomment and modify:
+Раскомментируйте и измените:
 
 ```
 DefaultLimitNOFILE=65535
 ```
 
-Edit `/etc/systemd/user.conf`:
+Отредактируйте `/etc/systemd/user.conf`:
 
 ```bash
 sudo vi /etc/systemd/user.conf
 ```
 
-Uncomment and modify:
+Раскомментируйте и измените:
 
 ```
 DefaultLimitNOFILE=65535
 ```
 
-##### 4.3: Create or Modify `/etc/security/limits.d/90-nofile.conf`
+##### 4.3: Создание или изменение `/etc/security/limits.d/90-nofile.conf`
 
 ```bash
 sudo vi /etc/security/limits.d/90-nofile.conf
 ```
 
-Add:
+Добавьте:
 
 ```
 root soft nofile 65535
 root hard nofile 65535
 ```
 
-##### 4.4: Adjust the System-wide File Descriptor Limit
+##### 4.4: Настройка системного лимита файловых дескрипторов
 
-Edit `/etc/sysctl.conf`:
+Отредактируйте `/etc/sysctl.conf`:
 
 ```bash
 sudo vi /etc/sysctl.conf
 ```
 
-Add:
+Добавьте:
 
 ```
 fs.file-max = 2097152
 ```
 
-Apply the changes:
+Примените изменения:
 
 ```bash
 sudo sysctl -p
 ```
 
-#### Step 5: Reload Systemd and Apply Changes
+#### Шаг 5: Перезагрузка Systemd и применение изменений
 
-Reload systemd to apply the new file descriptor limits:
+Перезагрузите systemd для применения новых лимитов:
 
 ```bash
 sudo systemctl daemon-reload
 ```
 
-#### Step 6: Modify PAM Configuration Files
+#### Шаг 6: Изменение файлов конфигурации PAM
 
-PAM (Pluggable Authentication Modules) manages how limits are enforced for user sessions. To ensure that the new file descriptor limits are respected, update the following configuration files.
+PAM (Pluggable Authentication Modules) управляет тем, как лимиты применяются к пользовательским сессиям. Чтобы новые лимиты файловых дескрипторов вступили в силу, обновите следующие файлы конфигурации.
 
-##### Step 6.1: Edit `/etc/pam.d/common-session` and `/etc/pam.d/common-session-noninteractive`
+##### Шаг 6.1: Отредактируйте `/etc/pam.d/common-session` и `/etc/pam.d/common-session-noninteractive`
 
 ```bash
 sudo vi /etc/pam.d/common-session
 sudo vi /etc/pam.d/common-session-noninteractive
 ```
 
-Add this line at the end of both files:
+Добавьте эту строку в конец обоих файлов:
 
 ```
 session required pam_limits.so
 ```
 
-This ensures that the limits set in `/etc/security/limits.conf` are enforced for all user sessions.
+Это обеспечит применение лимитов из `/etc/security/limits.conf` для всех пользовательских сессий.
 
-#### Step 7: Configure Services
+#### Шаг 7: Настройка сервисов
 
-##### 7.1: Bjorn Service
+##### 7.1: Сервис Bjorn
 
-Create the service file:
+Создайте файл сервиса:
 
 ```bash
 sudo vi /etc/systemd/system/bjorn.service
 ```
 
-Add the following content:
+Добавьте следующее содержимое:
 
 ```ini
 [Unit]
@@ -274,7 +274,7 @@ StandardError=inherit
 Restart=always
 User=root
 
-# Check open files and restart if it reached the limit (ulimit -n buffer of 1000)
+# Проверка открытых файлов и перезапуск при достижении лимита (буфер ulimit -n в 1000)
 ExecStartPost=/bin/bash -c 'FILE_LIMIT=$(ulimit -n); THRESHOLD=$(( FILE_LIMIT - 1000 )); while :; do TOTAL_OPEN_FILES=$(lsof | wc -l); if [ "$TOTAL_OPEN_FILES" -ge "$THRESHOLD" ]; then echo "File descriptor threshold reached: $TOTAL_OPEN_FILES (threshold: $THRESHOLD). Restarting service."; systemctl restart bjorn.service; exit 0; fi; sleep 10; done &'
 
 [Install]
@@ -283,15 +283,15 @@ WantedBy=multi-user.target
 
 
 
-##### 7.2: Port 8000 Killer Script
+##### 7.2: Скрипт освобождения порта 8000
 
-Create the script to free up port 8000:
+Создайте скрипт для освобождения порта 8000:
 
 ```bash
 vi /home/bjorn/Bjorn/kill_port_8000.sh
 ```
 
-Add:
+Добавьте:
 
 ```bash
 #!/bin/bash
@@ -304,46 +304,46 @@ if [ -n "$PIDS" ]; then
 fi
 ```
 
-Make the script executable:
+Сделайте скрипт исполняемым:
 
 ```bash
 chmod +x /home/bjorn/Bjorn/kill_port_8000.sh
 ```
 
 
-##### 7.3: USB Gadget Configuration
+##### 7.3: Настройка USB Gadget
 
-Modify `/boot/firmware/cmdline.txt`:
+Измените `/boot/firmware/cmdline.txt`:
 
 ```bash
 sudo vi /boot/firmware/cmdline.txt
 ```
 
-Add the following right after `rootwait`:
+Добавьте следующее сразу после `rootwait`:
 
 ```
 modules-load=dwc2,g_ether
 ```
 
-Modify `/boot/firmware/config.txt`:
+Измените `/boot/firmware/config.txt`:
 
 ```bash
 sudo vi /boot/firmware/config.txt
 ```
 
-Add at the end of the file:
+Добавьте в конец файла:
 
 ```
 dtoverlay=dwc2
 ```
 
-Create the USB gadget script:
+Создайте скрипт USB gadget:
 
 ```bash
 sudo vi /usr/local/bin/usb-gadget.sh
 ```
 
-Add the following content:
+Добавьте следующее содержимое:
 
 ```bash
 #!/bin/bash
@@ -370,13 +370,13 @@ echo 250 > configs/c.1/MaxPower
 
 mkdir -p functions/ecm.usb0
 
-# Check for existing symlink and remove if necessary
+# Проверка существующей символической ссылки и удаление при необходимости
 if [ -L configs/c.1/ecm.usb0 ]; then
     rm configs/c.1/ecm.usb0
 fi
 ln -s functions/ecm.usb0 configs/c.1/
 
-# Ensure the device is not busy before listing available USB device controllers
+# Ожидание освобождения устройства перед перечислением USB-контроллеров
 max_retries=10
 retry_count=0
 
@@ -389,7 +389,7 @@ while ! ls /sys/class/udc > UDC 2>/dev/null; do
     sleep 1
 done
 
-# Check if the usb0 interface is already configured
+# Проверка, настроен ли уже интерфейс usb0
 if ! ip addr show usb0 | grep -q "172.20.2.1"; then
     ifconfig usb0 172.20.2.1 netmask 255.255.255.0
 else
@@ -397,19 +397,19 @@ else
 fi
 ```
 
-Make the script executable:
+Сделайте скрипт исполняемым:
 
 ```bash
 sudo chmod +x /usr/local/bin/usb-gadget.sh
 ```
 
-Create the systemd service:
+Создайте systemd-сервис:
 
 ```bash
 sudo vi /etc/systemd/system/usb-gadget.service
 ```
 
-Add:
+Добавьте:
 
 ```ini
 [Unit]
@@ -426,13 +426,13 @@ RemainAfterExit=yes
 WantedBy=multi-user.target
 ```
 
-Configure `usb0`:
+Настройте `usb0`:
 
 ```bash
 sudo vi /etc/network/interfaces
 ```
 
-Add:
+Добавьте:
 
 ```bash
 allow-hotplug usb0
@@ -441,7 +441,7 @@ iface usb0 inet static
     netmask 255.255.255.0
 ```
 
-Reload the services:
+Перезагрузите сервисы:
 
 ```bash
 sudo systemctl daemon-reload
@@ -451,18 +451,18 @@ sudo systemctl start systemd-networkd
 sudo systemctl start usb-gadget
 ```
 
-You must reboot to be able to use it as a USB gadget (with ip)
-###### Windows PC Configuration
+Для использования в качестве USB gadget необходимо выполнить перезагрузку.
+###### Настройка Windows PC
 
-Set the static IP address on your Windows PC:
+Установите статический IP-адрес на вашем Windows PC:
 
-- **IP Address**: `172.20.2.2`
-- **Subnet Mask**: `255.255.255.0`
-- **Default Gateway**: `172.20.2.1`
-- **DNS Servers**: `8.8.8.8`, `8.8.4.4`
+- **IP-адрес**: `172.20.2.2`
+- **Маска подсети**: `255.255.255.0`
+- **Шлюз по умолчанию**: `172.20.2.1`
+- **DNS-серверы**: `8.8.8.8`, `8.8.4.4`
 
 ---
 
-## 📜 License
+## 📜 Лицензия
 
-2024 - Bjorn is distributed under the MIT License. For more details, please refer to the [LICENSE](LICENSE) file included in this repository.
+2024 — Bjorn распространяется под лицензией MIT. Подробности см. в файле [LICENSE](LICENSE).
