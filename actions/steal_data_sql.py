@@ -165,12 +165,6 @@ class StealDataSQL:
             logger.error(f"Unexpected error during execution for {ip}:{port}: {e}")
             return 'failed'
 
-    def b_parent_action(self, row):
-        """
-        Get the parent action status from the row.
-        """
-        return row.get(b_parent, {}).get(b_status, '')
-
 if __name__ == "__main__":
     shared_data = SharedData()
     try:

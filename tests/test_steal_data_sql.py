@@ -10,9 +10,9 @@ class TestStealDataSqlParentAction:
         from actions.steal_data_sql import StealDataSQL
         instance = StealDataSQL(mock_shared_data)
 
-        assert isinstance(instance.b_parent_action, str) or \
-               not callable(instance.b_parent_action), \
-            "b_parent_action should be a string (set by orchestrator), not a method"
+        assert not hasattr(instance, 'b_parent_action') or \
+               not callable(getattr(instance, 'b_parent_action', None)), \
+            "b_parent_action should not be a callable method on the instance"
 
     def test_b_parent_action_dead_method_has_undefined_names(self):
         import ast
