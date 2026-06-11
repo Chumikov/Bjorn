@@ -141,7 +141,7 @@ class RDPConnector:
         with Progress(SpinnerColumn(), TextColumn("[progress.description]{task.description}"), BarColumn(), TextColumn("[progress.percentage]{task.percentage:>3.0f}%")) as progress:
             task_id = progress.add_task("[cyan]Bruteforcing RDP...", total=total_tasks)
 
-            for _ in range(40):  # Adjust the number of threads based on the RPi Zero's capabilities
+            for _ in range(10):  # Limit threads for RPi Zero (512MB RAM, 1 core)
                 t = threading.Thread(target=self.worker, args=(progress, task_id, success_flag))
                 t.start()
                 threads.append(t)
