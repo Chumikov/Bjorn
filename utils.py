@@ -10,6 +10,7 @@ import uuid
 import cgi
 import io
 import importlib
+import glob
 import logging
 from datetime import datetime
 from logger import Logger
@@ -149,7 +150,11 @@ class WebUtils:
         try:
             log_file_path = self.shared_data.webconsolelog
             if not os.path.exists(log_file_path):
-                subprocess.Popen(f"sudo tail -f /home/bjorn/Bjorn/data/logs/* > {log_file_path}", shell=True)
+                log_files = glob.glob('/home/bjorn/Bjorn/data/logs/*')
+                if log_files:
+                    log_fh = open(log_file_path, 'w')
+                    subprocess.Popen(['sudo', 'tail', '-f'] + log_files,
+                                     stdout=log_fh, stderr=subprocess.PIPE)
 
             with open(log_file_path, 'r') as log_file:
                 log_lines = log_file.readlines()
@@ -471,8 +476,7 @@ class WebUtils:
             password = params['password']
 
             self.update_nmconnection(ssid, password)
-            command = f'sudo nmcli connection up "preconfigured"'
-            connect_result = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+            connect_result = subprocess.Popen(['sudo', 'nmcli', 'connection', 'up', 'preconfigured'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
             stdout, stderr = connect_result.communicate()
             if connect_result.returncode != 0:
                 raise Exception(stderr)
@@ -492,8 +496,7 @@ class WebUtils:
 
     def disconnect_and_clear_wifi(self, handler):
         try:
-            command_disconnect = 'sudo nmcli connection down "preconfigured"'
-            disconnect_result = subprocess.Popen(command_disconnect, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+            disconnect_result = subprocess.Popen(['sudo', 'nmcli', 'connection', 'down', 'preconfigured'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
             stdout, stderr = disconnect_result.communicate()
             if disconnect_result.returncode != 0:
                 raise Exception(stderr)
@@ -519,22 +522,22 @@ class WebUtils:
 
     def clear_files(self, handler):
         try:
-            command = """
-            sudo rm -rf config/*.json && sudo rm -rf data/*.csv && sudo rm -rf data/*.log  && sudo rm -rf backup/backups/* && sudo rm -rf backup/uploads/* && sudo rm -rf data/output/data_stolen/* && sudo rm -rf data/output/crackedpwd/* && sudo rm -rf config/* && sudo rm -rf data/output/scan_results/* && sudo rm -rf __pycache__ && sudo rm -rf config/__pycache__ && sudo rm -rf data/__pycache__  && sudo rm -rf actions/__pycache__  && sudo rm -rf resources/__pycache__ && sudo rm -rf web/__pycache__ && sudo rm -rf *.log && sudo rm -rf resources/waveshare_epd/__pycache__ && sudo rm -rf data/logs/*  && sudo rm -rf data/output/vulnerabilities/* && sudo rm -rf data/logs/*
-            """
-            result = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-            stdout, stderr = result.communicate()
-
-            if result.returncode == 0:
-                handler.send_response(200)
-                handler.send_header("Content-type", "application/json")
-                handler.end_headers()
-                handler.wfile.write(json.dumps({"status": "success", "message": "Files cleared successfully"}).encode('utf-8'))
-            else:
-                handler.send_response(500)
-                handler.send_header("Content-type", "application/json")
-                handler.end_headers()
-                handler.wfile.write(json.dumps({"status": "error", "message": stderr}).encode('utf-8'))
+            clear_dirs = [
+                'config/*.json', 'data/*.csv', 'data/*.log', 'backup/backups/*',
+                'backup/uploads/*', 'data/output/data_stolen/*', 'data/output/crackedpwd/*',
+                'config/*', 'data/output/scan_results/*', '__pycache__', 'config/__pycache__',
+                'data/__pycache__', 'actions/__pycache__', 'resources/__pycache__',
+                'web/__pycache__', '*.log', 'resources/waveshare_epd/__pycache__',
+                'data/logs/*', 'data/output/vulnerabilities/*',
+            ]
+            for pattern in clear_dirs:
+                for path in glob.glob(pattern):
+                    subprocess.run(['sudo', 'rm', '-rf', path], check=True,
+                                   stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+            handler.send_response(200)
+            handler.send_header("Content-type", "application/json")
+            handler.end_headers()
+            handler.wfile.write(json.dumps({"status": "success", "message": "Files cleared successfully"}).encode('utf-8'))
         except Exception as e:
             handler.send_response(500)
             handler.send_header("Content-type", "application/json")
@@ -543,22 +546,21 @@ class WebUtils:
 
     def clear_files_light(self, handler):
         try:
-            command = """
-            sudo rm -rf data/*.log && sudo rm -rf data/output/data_stolen/* && sudo rm -rf data/output/crackedpwd/*  && sudo rm -rf data/output/scan_results/* && sudo rm -rf __pycache__ && sudo rm -rf config/__pycache__ && sudo rm -rf data/__pycache__  && sudo rm -rf actions/__pycache__  && sudo rm -rf resources/__pycache__ && sudo rm -rf web/__pycache__ && sudo rm -rf *.log && sudo rm -rf resources/waveshare_epd/__pycache__ && sudo rm -rf data/logs/*  && sudo rm -rf data/output/vulnerabilities/* && sudo rm -rf data/logs/*
-            """
-            result = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-            stdout, stderr = result.communicate()
-
-            if result.returncode == 0:
-                handler.send_response(200)
-                handler.send_header("Content-type", "application/json")
-                handler.end_headers()
-                handler.wfile.write(json.dumps({"status": "success", "message": "Files cleared successfully"}).encode('utf-8'))
-            else:
-                handler.send_response(500)
-                handler.send_header("Content-type", "application/json")
-                handler.end_headers()
-                handler.wfile.write(json.dumps({"status": "error", "message": stderr}).encode('utf-8'))
+            clear_dirs = [
+                'data/*.log', 'data/output/data_stolen/*', 'data/output/crackedpwd/*',
+                'data/output/scan_results/*', '__pycache__', 'config/__pycache__',
+                'data/__pycache__', 'actions/__pycache__', 'resources/__pycache__',
+                'web/__pycache__', '*.log', 'resources/waveshare_epd/__pycache__',
+                'data/logs/*', 'data/output/vulnerabilities/*',
+            ]
+            for pattern in clear_dirs:
+                for path in glob.glob(pattern):
+                    subprocess.run(['sudo', 'rm', '-rf', path], check=True,
+                                   stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+            handler.send_response(200)
+            handler.send_header("Content-type", "application/json")
+            handler.end_headers()
+            handler.wfile.write(json.dumps({"status": "success", "message": "Files cleared successfully"}).encode('utf-8'))
         except Exception as e:
             handler.send_response(500)
             handler.send_header("Content-type", "application/json")
@@ -582,8 +584,7 @@ class WebUtils:
 
     def reboot_system(self, handler):
         try:
-            command = "sudo reboot"
-            subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+            subprocess.Popen(['sudo', 'reboot'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
             handler.send_response(200)
             handler.send_header("Content-type", "application/json")
             handler.end_headers()
@@ -596,8 +597,7 @@ class WebUtils:
 
     def shutdown_system(self, handler):
         try:
-            command = "sudo shutdown now"
-            subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+            subprocess.Popen(['sudo', 'shutdown', 'now'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
             handler.send_response(200)
             handler.send_header("Content-type", "application/json")
             handler.end_headers()
@@ -610,8 +610,7 @@ class WebUtils:
 
     def restart_bjorn_service(self, handler):
         try:
-            command = "sudo systemctl restart bjorn.service"
-            subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+            subprocess.Popen(['sudo', 'systemctl', 'restart', 'bjorn.service'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
             handler.send_response(200)
             handler.send_header("Content-type", "application/json")
             handler.end_headers()

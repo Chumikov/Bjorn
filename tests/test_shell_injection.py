@@ -18,32 +18,30 @@ class TestNoShellInjection:
         return results
 
     def test_clear_files_uses_list_args(self, mock_handler, mock_shared_data):
-        with patch("utils.subprocess.Popen") as mock_popen:
-            mock_proc = MagicMock()
-            mock_proc.communicate.return_value = ("", "")
-            mock_proc.returncode = 0
-            mock_popen.return_value = mock_proc
+        with patch("utils.subprocess.run") as mock_run, \
+             patch("utils.glob.glob", return_value=["/tmp/fake"]):
+            mock_run.return_value = MagicMock(returncode=0)
 
             from utils import WebUtils
             web_utils = WebUtils(mock_shared_data, MagicMock())
             web_utils.clear_files(mock_handler)
 
-            for args in self._get_popen_calls(mock_popen):
-                assert isinstance(args, list), f"clear_files still uses shell=True: {args!r}"
+            for c in mock_run.call_args_list:
+                args = c[0]
+                assert isinstance(args[0], list), f"clear_files still uses shell=True: {args!r}"
 
     def test_clear_files_light_uses_list_args(self, mock_handler, mock_shared_data):
-        with patch("utils.subprocess.Popen") as mock_popen:
-            mock_proc = MagicMock()
-            mock_proc.communicate.return_value = ("", "")
-            mock_proc.returncode = 0
-            mock_popen.return_value = mock_proc
+        with patch("utils.subprocess.run") as mock_run, \
+             patch("utils.glob.glob", return_value=["/tmp/fake"]):
+            mock_run.return_value = MagicMock(returncode=0)
 
             from utils import WebUtils
             web_utils = WebUtils(mock_shared_data, MagicMock())
             web_utils.clear_files_light(mock_handler)
 
-            for args in self._get_popen_calls(mock_popen):
-                assert isinstance(args, list), f"clear_files_light still uses shell=True: {args!r}"
+            for c in mock_run.call_args_list:
+                args = c[0]
+                assert isinstance(args[0], list), f"clear_files_light still uses shell=True: {args!r}"
 
     def test_reboot_uses_list_args(self, mock_handler, mock_shared_data):
         with patch("utils.subprocess.Popen") as mock_popen:
@@ -124,8 +122,11 @@ class TestNoShellInjection:
 
 class TestSmbclientNoShellInjection:
     def test_smbclient_uses_list_args(self, mock_shared_data):
-        import actions.smb_connector as smb_mod
-        with patch.object(smb_mod, "Popen") as mock_popen:
+        import sys
+        if 'actions.smb_connector' not in sys.modules:
+            sys.modules['smb'] = MagicMock()
+            sys.modules['smb.SMBConnection'] = MagicMock()
+        with patch("actions.smb_connector.Popen") as mock_popen:
             mock_proc = MagicMock()
             mock_proc.communicate.return_value = (b"", b"")
             mock_proc.returncode = 1
@@ -144,8 +145,11 @@ class TestSmbclientNoShellInjection:
                 assert isinstance(args[0], list), "smbclient_l still uses shell=True"
 
     def test_smbclient_does_not_execute_semicolon(self, mock_shared_data):
-        import actions.smb_connector as smb_mod
-        with patch.object(smb_mod, "Popen") as mock_popen:
+        import sys
+        if 'actions.smb_connector' not in sys.modules:
+            sys.modules['smb'] = MagicMock()
+            sys.modules['smb.SMBConnection'] = MagicMock()
+        with patch("actions.smb_connector.Popen") as mock_popen:
             mock_proc = MagicMock()
             mock_proc.communicate.return_value = (b"Sharename\n---------\nshare1", b"")
             mock_proc.returncode = 0

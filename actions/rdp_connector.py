@@ -89,9 +89,9 @@ class RDPConnector:
         """
         Attempt to connect to an RDP service using the given credentials.
         """
-        command = f"xfreerdp /v:{adresse_ip} /u:{user} /p:{password} /cert:ignore +auth-only"
+        command = ['xfreerdp', f'/v:{adresse_ip}', f'/u:{user}', f'/p:{password}', '/cert:ignore', '+auth-only']
         try:
-            process = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             stdout, stderr = process.communicate()
             if process.returncode == 0:
                 return True
