@@ -22,6 +22,7 @@ import csv
 import logging
 import subprocess
 import uuid
+import threading
 from PIL import Image, ImageFont 
 from logger import Logger
 from epd_helper import EPDHelper
@@ -38,6 +39,7 @@ logger = Logger(name="shared.py", level=logging.DEBUG) # Create a logger object
 class SharedData:
     """Shared data between the different modules."""
     def __init__(self):
+        self._data_lock = threading.RLock()
         self.initialize_paths() # Initialize the paths used by the application
         self.status_list = [] 
         self.last_comment_time = time.time() # Last time a comment was displayed
@@ -629,60 +631,62 @@ class SharedData:
 
     def read_data(self):
         """Read data from the CSV file."""
-        self.initialize_csv()  # Ensure CSV is initialized with correct headers
-        data = []
-        with open(self.netkbfile, 'r') as file:
-            reader = csv.DictReader(file)
-            for row in reader:
-                data.append(row)
-        return data
+        with self._data_lock:
+            self.initialize_csv()  # Ensure CSV is initialized with correct headers
+            data = []
+            with open(self.netkbfile, 'r') as file:
+                reader = csv.DictReader(file)
+                for row in reader:
+                    data.append(row)
+            return data
 
     def write_data(self, data):
         """Write data to the CSV file."""
-        with open(self.actions_file, 'r') as file:
-            actions = json.load(file)
-        action_names = [action["b_class"] for action in actions if "b_class" in action]
+        with self._data_lock:
+            with open(self.actions_file, 'r') as file:
+                actions = json.load(file)
+            action_names = [action["b_class"] for action in actions if "b_class" in action]
 
-        # Read existing CSV file if it exists
-        if os.path.exists(self.netkbfile):
-            with open(self.netkbfile, 'r') as file:
-                reader = csv.DictReader(file)
-                existing_headers = reader.fieldnames
-                existing_data = list(reader)
-        else:
-            existing_headers = []
-            existing_data = []
-
-        # Check for missing action columns and add them
-        new_headers = ["MAC Address", "IPs", "Hostnames", "Alive", "Ports"] + action_names
-        missing_headers = [header for header in new_headers if header not in existing_headers]
-
-        # Update headers
-        headers = existing_headers + missing_headers
-
-        # Merge new data with existing data
-        mac_to_existing_row = {row["MAC Address"]: row for row in existing_data}
-
-        for new_row in data:
-            mac_address = new_row["MAC Address"]
-            if mac_address in mac_to_existing_row:
-                # Update the existing row with new data
-                existing_row = mac_to_existing_row[mac_address]
-                for key, value in new_row.items():
-                    if value:
-                        existing_row[key] = value
+            # Read existing CSV file if it exists
+            if os.path.exists(self.netkbfile):
+                with open(self.netkbfile, 'r') as file:
+                    reader = csv.DictReader(file)
+                    existing_headers = reader.fieldnames
+                    existing_data = list(reader)
             else:
-                # Add new row
-                mac_to_existing_row[mac_address] = new_row
+                existing_headers = []
+                existing_data = []
 
-        # Write updated data back to CSV
-        with open(self.netkbfile, 'w', newline='') as file:
-            writer = csv.DictWriter(file, fieldnames=headers)
-            writer.writeheader()
+            # Check for missing action columns and add them
+            new_headers = ["MAC Address", "IPs", "Hostnames", "Alive", "Ports"] + action_names
+            missing_headers = [header for header in new_headers if header not in existing_headers]
 
-            # Write all data
-            for row in mac_to_existing_row.values():
-                writer.writerow(row)
+            # Update headers
+            headers = existing_headers + missing_headers
+
+            # Merge new data with existing data
+            mac_to_existing_row = {row["MAC Address"]: row for row in existing_data}
+
+            for new_row in data:
+                mac_address = new_row["MAC Address"]
+                if mac_address in mac_to_existing_row:
+                    # Update the existing row with new data
+                    existing_row = mac_to_existing_row[mac_address]
+                    for key, value in new_row.items():
+                        if value:
+                            existing_row[key] = value
+                else:
+                    # Add new row
+                    mac_to_existing_row[mac_address] = new_row
+
+            # Write updated data back to CSV
+            with open(self.netkbfile, 'w', newline='') as file:
+                writer = csv.DictWriter(file, fieldnames=headers)
+                writer.writeheader()
+
+                # Write all data
+                for row in mac_to_existing_row.values():
+                    writer.writerow(row)
 
     def update_stats(self):
         """Update the stats based on formulas."""

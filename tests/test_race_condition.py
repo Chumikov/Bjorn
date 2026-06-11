@@ -40,6 +40,7 @@ class TestRaceCondition:
 
         with patch.object(SharedData, '__init__', lambda self: None):
             sd = SharedData.__new__(SharedData)
+            sd._data_lock = threading.RLock()
             sd.netkbfile = str(netkb)
             sd.actions_file = str(tmp_path / "actions.json")
             sd.currentdir = str(tmp_path)
@@ -84,6 +85,7 @@ class TestRaceCondition:
 
         with patch.object(SharedData, '__init__', lambda self: None):
             sd = SharedData.__new__(SharedData)
+            sd._data_lock = threading.RLock()
             sd.netkbfile = str(netkb)
             sd.actions_file = str(tmp_path / "actions.json")
             sd.currentdir = str(tmp_path)
@@ -120,9 +122,8 @@ class TestRaceCondition:
     def test_data_lock_exists(self, mock_shared_data):
         import sys
         sys.modules.pop('shared', None)
-        from shared import SharedData
-
-        with patch.object(SharedData, '__init__', lambda self: None):
-            sd = SharedData.__new__(SharedData)
-            assert hasattr(sd, '_data_lock'), "SharedData should have _data_lock attribute"
-            assert isinstance(sd._data_lock, type(threading.RLock())), "_data_lock should be an RLock"
+        import shared as shared_mod
+        import inspect
+        source = inspect.getsource(shared_mod.SharedData.__init__)
+        assert '_data_lock' in source, "SharedData.__init__ should initialize _data_lock"
+        assert 'RLock' in source, "_data_lock should be initialized with threading.RLock()"
