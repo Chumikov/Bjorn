@@ -212,11 +212,9 @@ def handle_exit_web(signum, frame):
 # Initialize the web thread
 web_thread = WebThread(port=8000)
 
-# Set up signal handling for graceful shutdown
-signal.signal(signal.SIGINT, handle_exit_web)
-signal.signal(signal.SIGTERM, handle_exit_web)
-
 if __name__ == "__main__":
+    signal.signal(signal.SIGINT, handle_exit_web)
+    signal.signal(signal.SIGTERM, handle_exit_web)
     try:
         # Start the web server thread
         web_thread.start()
