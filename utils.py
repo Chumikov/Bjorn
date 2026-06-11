@@ -257,8 +257,24 @@ class WebUtils:
             handler.end_headers()
             handler.wfile.write(json.dumps({"status": "error", "message": str(e)}).encode('utf-8'))
 
+    def _is_safe_path(self, base_dir, user_path):
+        if '\x00' in user_path:
+            return False
+        base_real = os.path.realpath(base_dir)
+        resolved = os.path.realpath(os.path.join(base_dir, user_path))
+        return resolved.startswith(base_real + os.sep) or resolved == base_real
+
     def download_backup(self, handler):
-        query = unquote(handler.path.split('?filename=')[1])
+        try:
+            query = unquote(handler.path.split('?filename=')[1])
+        except (IndexError, ValueError):
+            handler.send_response(400)
+            handler.end_headers()
+            return
+        if not self._is_safe_path(self.shared_data.backupdir, query):
+            handler.send_response(403)
+            handler.end_headers()
+            return
         backup_path = os.path.join(self.shared_data.backupdir, query)
         if os.path.isfile(backup_path):
             handler.send_response(200)
@@ -795,6 +811,10 @@ method=auto
     def download_file(self, handler):
         try:
             query = unquote(handler.path.split('?path=')[1])
+            if not self._is_safe_path(self.shared_data.datastolendir, query):
+                handler.send_response(403)
+                handler.end_headers()
+                return
             file_path = os.path.join(self.shared_data.datastolendir, query)
             if os.path.isfile(file_path):
                 handler.send_response(200)
