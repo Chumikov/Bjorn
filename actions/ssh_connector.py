@@ -88,7 +88,7 @@ class SSHConnector:
         Attempt to connect to an SSH service using the given credentials.
         """
         ssh = paramiko.SSHClient()
-        ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        ssh.set_missing_host_key_policy(paramiko.WarningPolicy())
         
         try:
             ssh.connect(adresse_ip, username=user, password=password, banner_timeout=200)  # Adjust timeout as necessary

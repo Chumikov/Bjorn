@@ -40,7 +40,7 @@ class StealFilesSSH:
         """
         try:
             ssh = paramiko.SSHClient()
-            ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+            ssh.set_missing_host_key_policy(paramiko.WarningPolicy())
             ssh.connect(ip, username=username, password=password)
             logger.info(f"Connected to {ip} via SSH with username {username}")
             return ssh
