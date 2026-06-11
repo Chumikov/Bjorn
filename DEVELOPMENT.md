@@ -370,4 +370,4 @@ sudo rm -rf /home/bjorn/Bjorn/config/*.json \
 
 ## 📜 Лицензия
 
-2024 — Bjorn распространяется под лицензией MIT. Подробности см. в файле [LICENSE](LICENSE).
+2024 infinition, 2026 Chumikov — Bjorn распространяется под лицензией MIT. Подробности см. в файле [LICENSE](LICENSE).
