@@ -86,6 +86,11 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             self.end_headers()
             response = json.dumps({"web_delay": self.shared_data.web_delay})
             self.wfile.write(response.encode('utf-8'))
+        elif self.path == '/version':
+            self.send_response(200)
+            self.send_header("Content-type", "application/json")
+            self.end_headers()
+            self.wfile.write(json.dumps({"version": self.shared_data.version}).encode('utf-8'))
         elif self.path == '/scan_wifi':
             self.web_utils.scan_wifi(self)
         elif self.path == '/network_data':

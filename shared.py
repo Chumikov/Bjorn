@@ -26,6 +26,12 @@ from logger import Logger
 from epd_helper import EPDHelper
 
 
+def _read_version():
+    version_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "version.txt")
+    with open(version_file) as f:
+        return f.read().strip()
+
+
 logger = Logger(name="shared.py", level=logging.DEBUG) # Create a logger object 
 
 class SharedData:
@@ -274,6 +280,7 @@ class SharedData:
         
     def initialize_variables(self):
         """Initialize the variables."""
+        self.version = _read_version()
         self.should_exit = False
         self.display_should_exit = False
         self.orchestrator_should_exit = False 

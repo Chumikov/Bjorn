@@ -134,6 +134,7 @@ if __name__ == "__main__":
     try:
         logger.info("Loading shared data config...")
         shared_data.load_config()
+        logger.info(f"Bjorn v{shared_data.version}")
 
         logger.info("Starting display thread...")
         shared_data.display_should_exit = False  # Initialize display should_exit

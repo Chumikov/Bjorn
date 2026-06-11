@@ -12,6 +12,15 @@
     <script src="https://cdn3.devexpress.com/jslib/20.2.5/js/dx.all.js"></script>
     <link rel="stylesheet" href="https://cdn3.devexpress.com/jslib/20.2.5/css/dx.common.css">
     <link rel="stylesheet" href="https://cdn3.devexpress.com/jslib/20.2.5/css/dx.light.css">
+    <script>
+        fetch('/version').then(r=>r.json()).then(d=>{
+            document.title='Bjorn v'+d.version+' - Playground';
+            var s=document.createElement('span');
+            s.textContent='v'+d.version;
+            s.style.cssText='color:#888;font-size:12px;align-self:center;margin-left:8px;';
+            document.getElementById('mainToolbar').appendChild(s);
+        });
+    </script>
 </head>
 
 <body>
