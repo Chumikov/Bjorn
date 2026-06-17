@@ -13,7 +13,7 @@ import glob
 import logging
 from datetime import datetime
 from logger import Logger
-from urllib.parse import unquote
+from urllib.parse import unquote, urlparse, parse_qs
 from actions.nmap_vuln_scanner import NmapVulnScanner
 
 
@@ -292,10 +292,26 @@ class WebUtils:
         resolved = os.path.realpath(os.path.join(base_dir, user_path))
         return resolved.startswith(base_real + os.sep) or resolved == base_real
 
+    @staticmethod
+    def _query_param(handler_path, param):
+        """Parse a single query-string parameter robustly (WEB-5).
+
+        ``handler.path.split('?param=')[1]`` breaks if the value itself
+        contains the substring ``param=``. Use urllib.parse instead so
+        values containing ``=``, ``&``, ``+`` etc. are decoded correctly.
+        Returns the decoded value or None if absent.
+        """
+        parsed = urlparse(handler_path)
+        params = parse_qs(parsed.query, keep_blank_values=True)
+        values = params.get(param)
+        if not values:
+            return None
+        # parse_qs already URL-decodes; no extra unquote() needed.
+        return values[0]
+
     def download_backup(self, handler):
-        try:
-            query = unquote(handler.path.split('?filename=')[1])
-        except (IndexError, ValueError):
+        query = self._query_param(handler.path, 'filename')
+        if query is None:
             handler.send_response(400)
             handler.end_headers()
             return
@@ -832,7 +848,11 @@ method=auto
 
     def download_file(self, handler):
         try:
-            query = unquote(handler.path.split('?path=')[1])
+            query = self._query_param(handler.path, 'path')
+            if query is None:
+                handler.send_response(400)
+                handler.end_headers()
+                return
             if not self._is_safe_path(self.shared_data.datastolendir, query):
                 handler.send_response(403)
                 handler.end_headers()
