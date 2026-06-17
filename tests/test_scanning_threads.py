@@ -136,3 +136,54 @@ class TestHostnameCalledOnce:
         assert hostname_calls["count"] == 1, (
             f"hostname() should be called exactly once; got "
             f"{hostname_calls['count']}")
+
+
+# ---------------------------------------------------------------------------
+# SCN-3
+# ---------------------------------------------------------------------------
+
+
+class TestNetifacesReplaced:
+    def test_no_netifaces_import(self):
+        """netifaces must not be imported (replaced by psutil)."""
+        with open("actions/scanning.py", encoding="utf-8") as f:
+            src = f.read()
+        for i, line in enumerate(src.splitlines(), 1):
+            stripped = line.lstrip()
+            if stripped.startswith("#"):
+                continue
+            assert "netifaces" not in line, (
+                f"Non-comment reference to netifaces at line {i}: {line!r}")
+
+    def test_psutil_imported(self):
+        with open("actions/scanning.py", encoding="utf-8") as f:
+            src = f.read()
+        assert "import psutil" in src, (
+            "scanning.py must import psutil (replaces netifaces).")
+
+    def test_get_network_calls_psutil_methods(self):
+        """Behavioral: get_network() must invoke psutil.net_if_gateways and
+        net_if_addrs (replacing the old netifaces calls)."""
+        sys.modules.pop("actions.scanning", None)
+        from actions import scanning as scanning_mod
+
+        ns = scanning_mod.NetworkScanner.__new__(scanning_mod.NetworkScanner)
+        ns.logger = MagicMock()
+
+        with patch.object(scanning_mod, "psutil") as mock_psutil:
+            ipv4_addr = MagicMock()
+            ipv4_addr.family = socket.AF_INET
+            ipv4_addr.address = "192.168.1.42"
+            ipv4_addr.netmask = "255.255.255.0"
+            mock_psutil.AF_INET = socket.AF_INET
+            mock_psutil.net_if_gateways.return_value = {
+                "default": {socket.AF_INET: ("192.168.1.1", "wlan0", True)}
+            }
+            mock_psutil.net_if_addrs.return_value = {"wlan0": [ipv4_addr]}
+
+            ns.get_network()
+
+            assert mock_psutil.net_if_gateways.called, (
+                "get_network() must call psutil.net_if_gateways()")
+            assert mock_psutil.net_if_addrs.called, (
+                "get_network() must call psutil.net_if_addrs()")

@@ -7,7 +7,7 @@ import threading
 import csv
 import pandas as pd
 import socket
-import netifaces
+import psutil
 import time
 import glob
 import logging
@@ -251,11 +251,27 @@ class NetworkScanner:
         Retrieves the network information including the default gateway and subnet.
         """
         try:
-            gws = netifaces.gateways()
-            default_gateway = gws['default'][netifaces.AF_INET][1]
-            iface = netifaces.ifaddresses(default_gateway)[netifaces.AF_INET][0]
-            ip_address = iface['addr']
-            netmask = iface['netmask']
+            # SCN-3: netifaces is abandoned and won't build on Python 3.12+.
+            # psutil provides the same info via net_if_gateways() /
+            # net_if_addrs() and is actively maintained.
+            gateways = psutil.net_if_gateways()
+            default_entry = gateways.get("default", {})
+            gw_info = default_entry.get(psutil.AF_INET)  # (ip, iface, is_default)
+            if not gw_info:
+                raise RuntimeError("No default IPv4 gateway found")
+            default_iface = gw_info[1]
+            addrs = psutil.net_if_addrs()
+            iface_addrs = addrs.get(default_iface, [])
+            ip_address = None
+            netmask = None
+            for addr in iface_addrs:
+                if addr.family == socket.AF_INET:
+                    ip_address = addr.address
+                    netmask = addr.netmask
+                    break
+            if not ip_address or not netmask:
+                raise RuntimeError(
+                    f"No IPv4 address on default interface {default_iface}")
             cidr = sum([bin(int(x)).count('1') for x in netmask.split('.')])
             network = ipaddress.IPv4Network(f"{ip_address}/{cidr}", strict=False)
             self.logger.info(f"Network: {network}")
