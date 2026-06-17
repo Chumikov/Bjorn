@@ -112,7 +112,12 @@ class Logger:
         self.logger.success('\n' + message) # Add newline for better readability
     
     def disable_logging(self):
-        logging.disable(logging.CRITICAL)
+        # Scope the disable to this logger only; the previous implementation
+        # used the module-level ``disable`` helper which silently muted every
+        # third-party logger in the process.
+        self.logger.setLevel(logging.CRITICAL + 1)
+        for handler in self.logger.handlers:
+            handler.setLevel(logging.CRITICAL + 1)
 
 
 # Example usage
