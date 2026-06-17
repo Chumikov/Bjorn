@@ -38,6 +38,7 @@ htmlcov/
 .coverage
 nosetests.xml
 coverage.xml
+coverage_html_report/
 
 # Generated at runtime
 web/screen.png

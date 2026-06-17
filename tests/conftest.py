@@ -1,5 +1,12 @@
-import sys
+import base64
+import io
 import os
+import socket
+import sys
+import threading
+import time
+import zipfile
+from http.server import HTTPServer, SimpleHTTPRequestHandler
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -94,3 +101,169 @@ def mock_handler():
     handler.end_headers = mock_end_headers
     handler._sent_headers = sent_headers
     return handler
+
+
+# ---------------------------------------------------------------------------
+# Stage -1 fixtures: in-process servers + helpers for v1.3.0 tests
+# ---------------------------------------------------------------------------
+
+
+class _SilentHTTPRequestHandler(SimpleHTTPRequestHandler):
+    """HTTP request handler that logs nothing and serves an empty directory."""
+
+    def log_message(self, *args, **kwargs):
+        return
+
+
+@pytest.fixture
+def real_http_server(tmp_path):
+    """Spin up an in-process HTTP server on a random port.
+
+    Yields a dict with keys: 'host', 'port', 'base_url', 'server', 'thread'.
+    The server runs in a daemon thread; it is shut down on fixture teardown.
+    """
+    (tmp_path / "index.html").write_text("<html>ok</html>")
+    httpd = HTTPServer(("127.0.0.1", 0), lambda *a, **kw: _SilentHTTPRequestHandler(
+        *a, directory=str(tmp_path), **kw))
+    host, port = httpd.server_address
+    thread = threading.Thread(target=httpd.serve_forever, daemon=True)
+    thread.start()
+    try:
+        yield {
+            "host": host,
+            "port": port,
+            "base_url": f"http://{host}:{port}",
+            "server": httpd,
+            "thread": thread,
+        }
+    finally:
+        httpd.shutdown()
+        httpd.server_close()
+        thread.join(timeout=3)
+
+
+@pytest.fixture
+def real_ftp_server():
+    """Minimal in-process FTP control-channel server (raw sockets).
+
+    Yields a dict with 'host', 'port', 'server_obj', 'thread', 'interactions'.
+    Each accepted client is handled in its own daemon thread; the server
+    records client commands in 'interactions' for assertion.
+
+    The server speaks just enough of the FTP control protocol for connection
+    lifecycle tests (USER/PASS/QUIT). It does NOT serve actual file transfers.
+    """
+    interactions = []
+
+    server_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    server_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    server_sock.bind(("127.0.0.1", 0))
+    server_sock.listen(5)
+    host, port = server_sock.getsockname()
+
+    accept_stop = threading.Event()
+
+    def handle_client(conn):
+        try:
+            conn.sendall(b"220 Bjorn test FTP ready\r\n")
+            buf = b""
+            while True:
+                try:
+                    data = conn.recv(1024)
+                except OSError:
+                    break
+                if not data:
+                    break
+                buf += data
+                while b"\r\n" in buf:
+                    line, buf = buf.split(b"\r\n", 1)
+                    cmd = line.decode(errors="replace").strip()
+                    interactions.append(cmd)
+                    upper = cmd.upper()
+                    if upper.startswith("USER"):
+                        conn.sendall(b"331 need password\r\n")
+                    elif upper.startswith("PASS"):
+                        conn.sendall(b"230 logged in\r\n")
+                    elif upper.startswith("QUIT"):
+                        conn.sendall(b"221 bye\r\n")
+                        conn.close()
+                        return
+                    else:
+                        conn.sendall(b"502 not implemented\r\n")
+        except Exception:
+            pass
+        finally:
+            try:
+                conn.close()
+            except Exception:
+                pass
+
+    def accept_loop():
+        while not accept_stop.is_set():
+            try:
+                server_sock.settimeout(0.2)
+                conn, _ = server_sock.accept()
+            except socket.timeout:
+                continue
+            except OSError:
+                break
+            threading.Thread(target=handle_client, args=(conn,), daemon=True).start()
+
+    thread = threading.Thread(target=accept_loop, daemon=True)
+    thread.start()
+
+    try:
+        yield {
+            "host": host,
+            "port": port,
+            "server_obj": server_sock,
+            "thread": thread,
+            "interactions": interactions,
+        }
+    finally:
+        accept_stop.set()
+        try:
+            server_sock.close()
+        except Exception:
+            pass
+        thread.join(timeout=3)
+
+
+@pytest.fixture
+def auth_headers():
+    """Default Basic auth headers matching admin:bjorn (WEB-8)."""
+    creds = base64.b64encode(b"admin:bjorn").decode("ascii")
+    return {"Authorization": f"Basic {creds}"}
+
+
+@pytest.fixture
+def sample_zip_with_traversal(tmp_path):
+    """Factory: build a ZIP whose entry name attempts path traversal.
+
+    Returns a callable taking (target_path, content) and returning the Path
+    to the crafted .zip file under tmp_path.
+    """
+    def _make(target="../../tmp/bjorn_pwned.txt", content=b"pwned", name="evil.zip"):
+        zip_path = tmp_path / name
+        # Build raw ZIP bytes so we can inject an arbitrary member name
+        # (ZipInfo normalises some sequences; writing bytes preserves our payload).
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+            zf.writestr(target, content)
+        zip_path.write_bytes(buf.getvalue())
+        return zip_path
+
+    return _make
+
+
+@pytest.fixture
+def wait_for_flag():
+    """Helper: poll a callable until it returns truthy or timeout (seconds)."""
+    def _wait(predicate, timeout=2.0, interval=0.02):
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            if predicate():
+                return True
+            time.sleep(interval)
+        return False
+    return _wait

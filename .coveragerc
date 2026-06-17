@@ -1,0 +1,30 @@
+[run]
+source = .
+omit =
+    resources/*
+    backup/*
+    tests/*
+    */__pycache__/*
+    __init__.py
+    IDLE.py
+    install_bjorn.sh
+    uninstall_bjorn.sh
+    kill_port_8000.sh
+    wifi_fix.sh
+
+[report]
+# Exclude defensive lines from coverage requirements
+exclude_lines =
+    pragma: no cover
+    raise NotImplementedError
+    if __name__ == .__main__.:
+    # Hardware-only paths
+    if .*epd
+    # Unreachable signal handlers
+    if .*should_exit:
+show_missing = True
+skip_covered = False
+precision = 2
+
+[html]
+directory = coverage_html_report
