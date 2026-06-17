@@ -65,8 +65,10 @@ class Logger:
         vertical_filter = VerticalFilter()
         console_handler.addFilter(vertical_filter)
 
-        # Add console handler to the logger
-        self.logger.addHandler(console_handler)
+        # Add console handler to the logger (guard against duplicates when
+        # Logger() is called repeatedly with the same name)
+        if not any(isinstance(h, RichHandler) for h in self.logger.handlers):
+            self.logger.addHandler(console_handler)
 
         if self.enable_file_logging:
             # Ensure the log folder exists
@@ -82,8 +84,9 @@ class Logger:
             # Add filter to file handler
             file_handler.addFilter(vertical_filter)
 
-            # Add file handler to the logger
-            self.logger.addHandler(file_handler)
+            # Add file handler to the logger (guard against duplicates)
+            if not any(isinstance(h, RotatingFileHandler) for h in self.logger.handlers):
+                self.logger.addHandler(file_handler)
     
     def set_level(self, level):
         self.logger.setLevel(level)
