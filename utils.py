@@ -150,11 +150,21 @@ class WebUtils:
         try:
             log_file_path = self.shared_data.webconsolelog
             if not os.path.exists(log_file_path):
+                # NOTE: hardcoded '/home/bjorn/Bjorn/...' path is a known
+                # portability defect; preserved here for compat but should
+                # resolve relative to shared_data.logsdir in a future fix.
                 log_files = glob.glob('/home/bjorn/Bjorn/data/logs/*')
                 if log_files:
-                    log_fh = open(log_file_path, 'w')
-                    subprocess.Popen(['sudo', 'tail', '-f'] + log_files,
-                                     stdout=log_fh, stderr=subprocess.PIPE)
+                    # UTL-2: track the tail process and the file handle so
+                    # they can be cleaned up via cleanup_tail() on shutdown.
+                    # Previously both leaked forever (zombie tail processes,
+                    # file descriptor exhaustion -> OSError [Errno 24]).
+                    self._tail_log_fh = open(log_file_path, 'w')
+                    self._tail_process = subprocess.Popen(
+                        ['sudo', 'tail', '-f'] + log_files,
+                        stdout=self._tail_log_fh,
+                        stderr=subprocess.PIPE,
+                    )
 
             with open(log_file_path, 'r') as log_file:
                 log_lines = log_file.readlines()
@@ -179,6 +189,31 @@ class WebUtils:
             handler.send_header("Content-type", "application/json")
             handler.end_headers()
             handler.wfile.write(json.dumps({"status": "error", "message": str(e)}).encode('utf-8'))
+
+    def cleanup_tail(self):
+        """Terminate the ``tail -f`` subprocess spawned by serve_logs and
+        close its stdout file handle (UTL-2).
+
+        Safe to call multiple times; no-op if nothing was spawned.
+        """
+        proc = getattr(self, "_tail_process", None)
+        if proc is not None:
+            try:
+                proc.terminate()
+                proc.wait(timeout=2)
+            except Exception:
+                try:
+                    proc.kill()
+                except Exception:
+                    pass
+            self._tail_process = None
+        fh = getattr(self, "_tail_log_fh", None)
+        if fh is not None:
+            try:
+                fh.close()
+            except Exception:
+                pass
+            self._tail_log_fh = None
 
     def start_orchestrator(self, handler):
         try:
