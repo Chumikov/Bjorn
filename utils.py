@@ -13,7 +13,7 @@ import glob
 import logging
 from datetime import datetime
 from logger import Logger
-from urllib.parse import unquote, urlparse, parse_qs
+from urllib.parse import urlparse, parse_qs
 from actions.nmap_vuln_scanner import NmapVulnScanner
 
 
