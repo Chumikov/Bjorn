@@ -130,35 +130,40 @@ class Display:
                     logger.info("Vulnerability summary file created.")
                 else:
                     if os.path.exists(self.shared_data.netkbfile):
-                        with open(self.shared_data.netkbfile, 'r') as file:
-                            netkb_df = pd.read_csv(file)
-                            alive_macs = set(netkb_df[(netkb_df["Alive"] == 1) & (netkb_df["MAC Address"] != "STANDALONE")]["MAC Address"])
+                        # DSP-2: pd.read_csv accepts a path directly; the
+                        # open() wrapper is redundant.
+                        netkb_df = pd.read_csv(self.shared_data.netkbfile)
+                        alive_macs = set(netkb_df[(netkb_df["Alive"] == 1) & (netkb_df["MAC Address"] != "STANDALONE")]["MAC Address"])
                     else:
                         alive_macs = set()
 
-                    with open(self.shared_data.vuln_summary_file, 'r') as file:
-                        df = pd.read_csv(file)
-                        all_vulnerabilities = set()
+                    # DSP-2: drop the unnecessary open() around read_csv.
+                    df = pd.read_csv(self.shared_data.vuln_summary_file)
+                    all_vulnerabilities = set()
 
-                        for index, row in df.iterrows():
-                            mac_address = row["MAC Address"]
-                            if mac_address in alive_macs and mac_address != "STANDALONE":
-                                vulnerabilities = row["Vulnerabilities"]
-                                if pd.isna(vulnerabilities) or not isinstance(vulnerabilities, str):
-                                    continue
+                    # DSP-4: vectorise instead of the slow row-iteration
+                    # pattern pandas docs warn against. Filter the
+                    # dataframe once, drop NaN, then split + unionise.
+                    alive_df = df[df["MAC Address"].isin(alive_macs)
+                                  & (df["MAC Address"] != "STANDALONE")]
+                    vuln_series = alive_df["Vulnerabilities"].dropna().astype(str)
+                    if not vuln_series.empty:
+                        # Join all rows, split on separator, deduplicate via set.
+                        joined = "; ".join(vuln_series.tolist())
+                        all_vulnerabilities = set(joined.split("; "))
 
-                                if vulnerabilities and isinstance(vulnerabilities, str):
-                                    all_vulnerabilities.update(vulnerabilities.split("; "))
-
-                        self.shared_data.vulnnbr = len(all_vulnerabilities)
-                        logger.debug(f"Updated vulnerabilities count: {self.shared_data.vulnnbr}")
+                    self.shared_data.vulnnbr = len(all_vulnerabilities)
+                    logger.debug(f"Updated vulnerabilities count: {self.shared_data.vulnnbr}")
 
                     if os.path.exists(self.shared_data.livestatusfile):
-                        with open(self.shared_data.livestatusfile, 'r+') as livestatus_file:
-                            livestatus_df = pd.read_csv(livestatus_file)
-                            livestatus_df.loc[0, 'Vulnerabilities Count'] = self.shared_data.vulnnbr
-                            livestatus_df.to_csv(self.shared_data.livestatusfile, index=False)
-                            logger.debug(f"Updated livestatusfile with vulnerability count: {self.shared_data.vulnnbr}")
+                        # DSP-1: previously to_csv() was called WHILE the
+                        # same file was open via `with open('r+')`, racing
+                        # and truncating under the live handle. Pass the
+                        # path directly to both read_csv and to_csv.
+                        livestatus_df = pd.read_csv(self.shared_data.livestatusfile)
+                        livestatus_df.loc[0, 'Vulnerabilities Count'] = self.shared_data.vulnnbr
+                        livestatus_df.to_csv(self.shared_data.livestatusfile, index=False)
+                        logger.debug(f"Updated livestatusfile with vulnerability count: {self.shared_data.vulnnbr}")
                     else:
                         logger.error(f"Livestatusfile {self.shared_data.livestatusfile} does not exist.")
             except Exception as e:
@@ -168,19 +173,18 @@ class Display:
         """Update the shared data with the latest system information."""
         with self.semaphore:
             try:
-                with open(self.shared_data.livestatusfile, 'r') as file:
-                    livestatus_df = pd.read_csv(file)
-                    self.shared_data.portnbr = livestatus_df['Total Open Ports'].iloc[0]
-                    self.shared_data.targetnbr = livestatus_df['Alive Hosts Count'].iloc[0]
-                    self.shared_data.networkkbnbr = livestatus_df['All Known Hosts Count'].iloc[0]
-                    self.shared_data.vulnnbr = livestatus_df['Vulnerabilities Count'].iloc[0]
+                # DSP-2: pd.read_csv accepts a path directly.
+                livestatus_df = pd.read_csv(self.shared_data.livestatusfile)
+                self.shared_data.portnbr = livestatus_df['Total Open Ports'].iloc[0]
+                self.shared_data.targetnbr = livestatus_df['Alive Hosts Count'].iloc[0]
+                self.shared_data.networkkbnbr = livestatus_df['All Known Hosts Count'].iloc[0]
+                self.shared_data.vulnnbr = livestatus_df['Vulnerabilities Count'].iloc[0]
 
                 crackedpw_files = glob.glob(f"{self.shared_data.crackedpwddir}/*.csv")
 
                 total_passwords = 0
                 for file in crackedpw_files:
-                    with open(file, 'r') as f:
-                        total_passwords += len(pd.read_csv(f, usecols=[0]))
+                    total_passwords += len(pd.read_csv(file, usecols=[0]))
 
                 self.shared_data.crednbr = total_passwords
 
@@ -341,13 +345,16 @@ class Display:
                     y_text += (self.shared_data.font_arialbold.getbbox(line)[3] - self.shared_data.font_arialbold.getbbox(line)[1]) + 3
 
                 if self.screen_reversed:
-                    image = image.transpose(Image.ROTATE_180)
+                    # DSP-3: the legacy module-level transpose constant is
+                    # deprecated since Pillow 9.1. The enum form is required
+                    # on Pillow 12+.
+                    image = image.transpose(Image.Transpose.ROTATE_180)
 
                 self.epd_helper.display_partial(image)
                 self.epd_helper.display_partial(image)
 
                 if self.web_screen_reversed:
-                    image = image.transpose(Image.ROTATE_180)
+                    image = image.transpose(Image.Transpose.ROTATE_180)
                 with open(os.path.join(self.shared_data.webdir, "screen.png"), 'wb') as img_file:
                     image.save(img_file)
                     img_file.flush()
