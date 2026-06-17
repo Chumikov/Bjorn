@@ -97,8 +97,14 @@ class Bjorn:
 
     def is_wifi_connected(self):
         """Checks for Wi-Fi connectivity using the nmcli command."""
-        result = subprocess.Popen(['nmcli', '-t', '-f', 'active', 'dev', 'wifi'], stdout=subprocess.PIPE, text=True).communicate()[0]
-        self.wifi_connected = 'yes' in result
+        # UTL-5: modern API (since Python 3.5). The legacy spawn-and-
+        # -communicate pattern is gone; run() returns a CompletedProcess
+        # whose stdout we consult directly.
+        result = subprocess.run(
+            ['nmcli', '-t', '-f', 'active', 'dev', 'wifi'],
+            capture_output=True, text=True, check=False,
+        )
+        self.wifi_connected = 'yes' in result.stdout
         return self.wifi_connected
 
     

@@ -535,7 +535,7 @@ class WebUtils:
                 raise Exception(stderr)
             networks = self.parse_scan_result(stdout)
             self.logger.info(f"Found {len(networks)} networks")
-            current_ssid = subprocess.Popen(['iwgetid', '-r'], stdout=subprocess.PIPE, text=True)
+            current_ssid = subprocess.Popen(['iwgetid', '-r'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
             ssid_out, ssid_err = current_ssid.communicate()
             if current_ssid.returncode != 0:
                 raise Exception(ssid_err)
@@ -598,8 +598,10 @@ class WebUtils:
             config_path = '/etc/NetworkManager/system-connections/preconfigured.nmconnection'
             with open(config_path, 'w') as f:
                 f.write("")
-            subprocess.Popen(['sudo', 'chmod', '600', config_path]).communicate()
-            subprocess.Popen(['sudo', 'nmcli', 'connection', 'reload']).communicate()
+            subprocess.run(['sudo', 'chmod', '600', config_path],
+                           check=False, capture_output=True, text=True)
+            subprocess.run(['sudo', 'nmcli', 'connection', 'reload'],
+                           check=False, capture_output=True, text=True)
 
             self.shared_data.wifichanged = False
 
@@ -678,7 +680,12 @@ class WebUtils:
 
     def reboot_system(self, handler):
         try:
-            subprocess.Popen(['sudo', 'reboot'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+            # UTL-3: was spawned via the legacy Popen API which never
+            # raises CalledProcessError; the except block below was dead.
+            # Switched to the modern run() with check=True so the 500 path
+            # actually fires on failure.
+            subprocess.run(['sudo', 'reboot'], check=True,
+                           capture_output=True, text=True)
             handler.send_response(200)
             handler.send_header("Content-type", "application/json")
             handler.end_headers()
@@ -691,7 +698,8 @@ class WebUtils:
 
     def shutdown_system(self, handler):
         try:
-            subprocess.Popen(['sudo', 'shutdown', 'now'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+            subprocess.run(['sudo', 'shutdown', 'now'], check=True,
+                           capture_output=True, text=True)
             handler.send_response(200)
             handler.send_header("Content-type", "application/json")
             handler.end_headers()
@@ -704,7 +712,8 @@ class WebUtils:
 
     def restart_bjorn_service(self, handler):
         try:
-            subprocess.Popen(['sudo', 'systemctl', 'restart', 'bjorn.service'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+            subprocess.run(['sudo', 'systemctl', 'restart', 'bjorn.service'],
+                           check=True, capture_output=True, text=True)
             handler.send_response(200)
             handler.send_header("Content-type", "application/json")
             handler.end_headers()
@@ -815,8 +824,10 @@ method=auto
 [ipv6]
 method=auto
 """)
-        subprocess.Popen(['sudo', 'chmod', '600', config_path]).communicate()
-        subprocess.Popen(['sudo', 'nmcli', 'connection', 'reload']).communicate()
+        subprocess.run(['sudo', 'chmod', '600', config_path],
+                       check=False, capture_output=True, text=True)
+        subprocess.run(['sudo', 'nmcli', 'connection', 'reload'],
+                       check=False, capture_output=True, text=True)
 
     def save_configuration(self, handler):
         try:

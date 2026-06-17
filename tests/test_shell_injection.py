@@ -44,46 +44,47 @@ class TestNoShellInjection:
                 assert isinstance(args[0], list), f"clear_files_light still uses shell=True: {args!r}"
 
     def test_reboot_uses_list_args(self, mock_handler, mock_shared_data):
-        with patch("utils.subprocess.Popen") as mock_popen:
-            mock_proc = MagicMock()
-            mock_proc.communicate.return_value = ("", "")
-            mock_proc.returncode = 0
-            mock_popen.return_value = mock_proc
+        # UTL-3: reboot_system now uses subprocess.run (was Popen).
+        # Patch run() and verify the args are a list (no shell=True).
+        with patch("utils.subprocess.run") as mock_run:
+            mock_run.return_value = MagicMock(returncode=0)
 
             from utils import WebUtils
             web_utils = WebUtils(mock_shared_data, MagicMock())
             web_utils.reboot_system(mock_handler)
 
-            for args in self._get_popen_calls(mock_popen):
-                assert isinstance(args, list), f"reboot still uses shell=True: {args!r}"
+            for c in mock_run.call_args_list:
+                args = c[0]
+                assert isinstance(args[0], list), (
+                    f"reboot still uses shell=True: {args!r}")
 
     def test_shutdown_uses_list_args(self, mock_handler, mock_shared_data):
-        with patch("utils.subprocess.Popen") as mock_popen:
-            mock_proc = MagicMock()
-            mock_proc.communicate.return_value = ("", "")
-            mock_proc.returncode = 0
-            mock_popen.return_value = mock_proc
+        # UTL-3: shutdown_system now uses subprocess.run.
+        with patch("utils.subprocess.run") as mock_run:
+            mock_run.return_value = MagicMock(returncode=0)
 
             from utils import WebUtils
             web_utils = WebUtils(mock_shared_data, MagicMock())
             web_utils.shutdown_system(mock_handler)
 
-            for args in self._get_popen_calls(mock_popen):
-                assert isinstance(args, list), f"shutdown still uses shell=True: {args!r}"
+            for c in mock_run.call_args_list:
+                args = c[0]
+                assert isinstance(args[0], list), (
+                    f"shutdown still uses shell=True: {args!r}")
 
     def test_restart_service_uses_list_args(self, mock_handler, mock_shared_data):
-        with patch("utils.subprocess.Popen") as mock_popen:
-            mock_proc = MagicMock()
-            mock_proc.communicate.return_value = ("", "")
-            mock_proc.returncode = 0
-            mock_popen.return_value = mock_proc
+        # UTL-3: restart_bjorn_service now uses subprocess.run.
+        with patch("utils.subprocess.run") as mock_run:
+            mock_run.return_value = MagicMock(returncode=0)
 
             from utils import WebUtils
             web_utils = WebUtils(mock_shared_data, MagicMock())
             web_utils.restart_bjorn_service(mock_handler)
 
-            for args in self._get_popen_calls(mock_popen):
-                assert isinstance(args, list), f"restart still uses shell=True: {args!r}"
+            for c in mock_run.call_args_list:
+                args = c[0]
+                assert isinstance(args[0], list), (
+                    f"restart still uses shell=True: {args!r}")
 
     def test_connect_wifi_uses_list_args(self, mock_handler, mock_shared_data):
         with patch("utils.subprocess.Popen") as mock_popen:
