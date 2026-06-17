@@ -83,11 +83,17 @@ def mock_shared_data(monkeypatch):
         sys.modules['getmac'] = MagicMock()
     if 'nmap' not in sys.modules:
         sys.modules['nmap'] = MagicMock()
+    # actions/smb_connector.py + actions/steal_files_smb.py import pysmb
+    # at module top-level.
+    if 'smb' not in sys.modules:
+        sys.modules['smb'] = MagicMock()
+    if 'smb.SMBConnection' not in sys.modules:
+        sys.modules['smb.SMBConnection'] = MagicMock()
 
     yield shared_mock
 
     for mod in ['init_shared', 'epd_helper', 'resources', 'resources.waveshare_epd',
-                'getmac', 'nmap']:
+                'getmac', 'nmap', 'smb', 'smb.SMBConnection']:
         sys.modules.pop(mod, None)
 
 

