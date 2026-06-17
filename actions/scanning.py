@@ -314,15 +314,25 @@ class NetworkScanner:
             """
             Starts the port scanning process for the specified range and extra ports.
             """
+            # SCN-1: collect spawned threads and join them before returning.
+            # Previously threads were fire-and-forget and the caller read
+            # self.open_ports while threads were still running (race).
+            threads = []
             try:
                 for port in range(self.portstart, self.portend):
                     t = threading.Thread(target=self.scan_with_semaphore, args=(port,))
                     t.start()
+                    threads.append(t)
                 for port in self.extra_ports:
                     t = threading.Thread(target=self.scan_with_semaphore, args=(port,))
                     t.start()
+                    threads.append(t)
             except Exception as e:
                 self.logger.info(f"Maximum threads defined in the semaphore reached: {e}")
+            # Wait for every scan thread to finish so self.open_ports is
+            # complete when start() returns.
+            for t in threads:
+                t.join()
 
         def scan_with_semaphore(self, port):
             """
@@ -369,11 +379,16 @@ class NetworkScanner:
 
             # Use nmap to scan for live hosts
             self.outer_instance.nm.scan(hosts=str(self.network), arguments='-sn')
+            # SCN-1: collect and join host-scan threads instead of relying
+            # on a fixed-time busy-wait that raced with slow hosts.
+            threads = []
             for host in self.outer_instance.nm.all_hosts():
                 t = threading.Thread(target=self.scan_host, args=(host,))
                 t.start()
+                threads.append(t)
+            for t in threads:
+                t.join(timeout=30)
 
-            time.sleep(5)
             self.outer_instance.sort_and_write_csv(self.csv_scan_file)
 
         def scan_host(self, ip):
@@ -383,7 +398,9 @@ class NetworkScanner:
             if self.outer_instance.blacklistcheck and ip in self.outer_instance.ip_scan_blacklist:
                 return
             try:
-                hostname = self.outer_instance.nm[ip].hostname() if self.outer_instance.nm[ip].hostname() else ''
+                # SCN-2: call .hostname() exactly once instead of twice
+                # (it was used both as the ternary test and the value).
+                hostname = self.outer_instance.nm[ip].hostname() or ''
                 mac = self.outer_instance.get_mac_address(ip, hostname)
                 if not self.outer_instance.blacklistcheck or mac not in self.outer_instance.mac_scan_blacklist:
                     with self.outer_instance.lock:
