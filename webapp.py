@@ -36,12 +36,39 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
                          self.log_date_time_string(),
                          format % args))
 
+    def send_response(self, code, message=None):
+        """Override to attach security headers (WEB-4) to every response.
+
+        The base implementation adds Server + Date headers; we follow it
+        with X-Content-Type-Options, X-Frame-Options, and a permissive CSP.
+        Every endpoint (including WebUtils methods in utils.py that call
+        handler.send_response) gets the headers automatically.
+        """
+        super().send_response(code, message)
+        self._send_security_headers()
+
     def gzip_encode(self, content):
         """Gzip compress the given content."""
         out = io.BytesIO()
-        with gzip.GzipFile(fileobj=out, mode="w") as f:
+        # Binary mode is required on Python 3.13+. The previous text-mode
+        # alias is deprecated and will be removed in a future version.
+        with gzip.GzipFile(fileobj=out, mode="wb") as f:
             f.write(content)
         return out.getvalue()
+
+    def _send_security_headers(self):
+        """Attach standard security headers to the in-flight response.
+
+        Call after send_response() and before end_headers(). Protects
+        against MIME-sniffing (X-Content-Type-Options), clickjacking
+        (X-Frame-Options), and limits injection vectors via CSP.
+        """
+        self.send_header("X-Content-Type-Options", "nosniff")
+        self.send_header("X-Frame-Options", "DENY")
+        # 'unsafe-inline' because the existing HTML/JS uses inline scripts
+        # and styles; tightening this requires refactoring web/.
+        self.send_header("Content-Security-Policy",
+                         "default-src 'self' 'unsafe-inline'; img-src 'self' data:;")
 
     def send_gzipped_response(self, content, content_type):
         """Send a gzipped HTTP response."""
