@@ -180,8 +180,8 @@ class SMBConnector:
     def run_bruteforce(self, adresse_ip, port):
         self.load_scan_file()  # Reload the scan file to get the latest IPs and ports
 
-        mac_address = self.scan.loc[self.scan['IPs'] == adresse_ip, 'MAC Address'].values[0]
-        hostname = self.scan.loc[self.scan['IPs'] == adresse_ip, 'Hostnames'].values[0]
+        mac_address = self.scan.loc[self.scan['IPs'] == adresse_ip, 'MAC Address'].iloc[0]
+        hostname = self.scan.loc[self.scan['IPs'] == adresse_ip, 'Hostnames'].iloc[0]
 
         total_tasks = len(self.users) * len(self.passwords)
         
