@@ -83,8 +83,11 @@ class FTPConnector:
         """
         Attempts to connect to the FTP server using the provided username and password.
         """
+        # FTP-1: previously conn.quit() was only on the success path.
+        # On exception paths (refused, auth failure, timeout) the FTP
+        # control socket leaked, contributing to OSError [Errno 24].
+        conn = FTP()
         try:
-            conn = FTP()
             conn.connect(adresse_ip, 21)
             conn.login(user, password)
             conn.quit()
@@ -92,6 +95,14 @@ class FTPConnector:
             return True
         except Exception as e:
             return False
+        finally:
+            # Close underlying socket regardless of outcome. quit() may
+            # already have closed it; close() is idempotent if sock is None.
+            try:
+                if conn.sock is not None:
+                    conn.close()
+            except Exception:
+                pass
 
     def worker(self, progress, task_id, success_flag):
         """

