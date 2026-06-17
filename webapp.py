@@ -185,11 +185,15 @@ class WebThread(threading.Thread):
         """
         while not self.shared_data.webapp_should_exit:
             try:
-                with socketserver.TCPServer(("", self.port), self.handler_class) as httpd:
+                with http.server.HTTPServer(("", self.port), self.handler_class) as httpd:
                     self.httpd = httpd
                     logger.info(f"Serving at port {self.port}")
-                    while not self.shared_data.webapp_should_exit:
-                        httpd.handle_request()
+                    # Blocks until httpd.shutdown() is called from another
+                    # thread (WebThread.shutdown). Previously the loop here
+                    # picked requests off one at a time, which caused
+                    # BaseServer.shutdown() to deadlock since it only knows
+                    # how to interrupt the forever-serving loop.
+                    httpd.serve_forever(poll_interval=0.5)
             except OSError as e:
                 if e.errno == 98:  # Address already in use error
                     logger.warning(f"Port {self.port} is in use, trying the next port...")
@@ -199,17 +203,29 @@ class WebThread(threading.Thread):
                     break
             finally:
                 if self.httpd:
-                    self.httpd.server_close()
+                    # server_close() releases the listening socket. The `with`
+                    # block above already does this on clean exit; this is a
+                    # fallback for the OSError path.
+                    try:
+                        self.httpd.server_close()
+                    except Exception:
+                        pass
+                    self.httpd = None
                     logger.info("Web server closed.")
 
     def shutdown(self):
         """
         Shutdown the web server gracefully.
+
+        httpd.shutdown() signals serve_forever() to exit. Must be called from
+        a different thread than the one running serve_forever().
         """
         if self.httpd:
-            self.httpd.shutdown()
-            self.httpd.server_close()
-            logger.info("Web server shutdown initiated.")
+            try:
+                self.httpd.shutdown()
+                logger.info("Web server shutdown initiated.")
+            except Exception as e:
+                logger.error(f"Error during web server shutdown: {e}")
 
 def handle_exit_web(signum, frame):
     """
