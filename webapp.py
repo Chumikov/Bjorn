@@ -23,7 +23,10 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
         self.shared_data = shared_data
         self.web_utils = WebUtils(shared_data, logger)
-        super().__init__(*args, **kwargs)
+        # Pass directory= so SimpleHTTPRequestHandler.do_GET() fallback (used
+        # for any static file not matched by our explicit routes) serves from
+        # webdir instead of os.getcwd().
+        super().__init__(*args, directory=self.shared_data.webdir, **kwargs)
 
     def log_message(self, format, *args):
         # Override to suppress logging of GET requests.
