@@ -1,6 +1,5 @@
 import os
 import logging
-from rich.console import Console
 from threading import Timer
 import time
 from smb.SMBConnection import SMBConnection

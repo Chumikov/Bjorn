@@ -6,7 +6,6 @@ import os
 import telnet_shim as telnetlib
 import logging
 import time
-from rich.console import Console
 from threading import Timer
 from shared import SharedData
 from logger import Logger
