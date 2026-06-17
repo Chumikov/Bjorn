@@ -148,7 +148,13 @@ class NmapVulnScanner:
         try:
             final_summary_file = os.path.join(self.shared_data.vulnerabilities_dir, "final_vulnerability_summary.csv")
             df = pd.read_csv(self.summary_file)
-            summary_data = df.groupby(["IP", "Hostname", "MAC Address"])["Vulnerabilities"].apply(lambda x: "; ".join(set("; ".join(x).split("; ")))).reset_index()
+            # NMAP-1: "; ".join(x) raised TypeError if any element of x
+            # was NaN (float) — which happens when a scan produced no
+            # vulnerability text and pandas read the empty cell as NaN.
+            # dropna() inside the lambda filters NaN before joining.
+            summary_data = df.groupby(["IP", "Hostname", "MAC Address"])["Vulnerabilities"].apply(
+                lambda x: "; ".join(set("; ".join(x.dropna()).split("; ")))
+            ).reset_index()
             summary_data.to_csv(final_summary_file, index=False)
             logger.info(f"Summary saved to {final_summary_file}")
         except Exception as e:
