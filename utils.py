@@ -268,7 +268,27 @@ class WebUtils:
                     output_file.write(file_content)
 
                 with zipfile.ZipFile(backup_path, 'r') as backup_zip:
-                    backup_zip.extractall(self.shared_data.currentdir)
+                    # filter='data' (Python 3.12+) blocks Zip Slip: crafted
+                    # archives with '../../etc/crontab' member names can no
+                    # longer write outside the target directory. The filter
+                    # also strips "behaviour-changing" entries that legacy
+                    # unix tools don't filter (device files, absolute paths).
+                    try:
+                        backup_zip.extractall(self.shared_data.currentdir, filter='data')
+                    except TypeError:
+                        # Python < 3.12 fallback: filter='data' doesn't exist.
+                        # Manual sanitisation: refuse any member whose abspath
+                        # escapes the target directory.
+                        target_root = os.path.realpath(self.shared_data.currentdir)
+                        for member in backup_zip.infolist():
+                            member_path = os.path.realpath(
+                                os.path.join(self.shared_data.currentdir, member.filename))
+                            if not (member_path == target_root
+                                    or member_path.startswith(target_root + os.sep)):
+                                raise ValueError(
+                                    f"Refusing to extract '{member.filename}': "
+                                    f"path traversal attempt blocked.")
+                        backup_zip.extractall(self.shared_data.currentdir)
 
                 handler.send_response(200)
                 handler.send_header("Content-type", "application/json")
