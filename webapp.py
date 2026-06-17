@@ -16,8 +16,10 @@ from utils import WebUtils
 # Initialize the logger
 logger = Logger(name="webapp.py", level=logging.DEBUG)
 
-# Set the path to the favicon
-favicon_path = os.path.join(shared_data.webdir, '/images/favicon.ico')
+# Set the path to the favicon. NOTE: a leading slash on the second arg would
+# make os.path.join() discard webdir entirely (absolute path semantics), so
+# the favicon would resolve to /images/favicon.ico at the filesystem root.
+favicon_path = os.path.join(shared_data.webdir, 'images/favicon.ico')
 
 class CustomHandler(http.server.SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):

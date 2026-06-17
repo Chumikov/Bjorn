@@ -438,7 +438,7 @@ class WebUtils:
         handler.send_response(200)
         handler.send_header("Content-type", "image/x-icon")
         handler.end_headers()
-        favicon_path = os.path.join(self.shared_data.webdir, '/images/favicon.ico')
+        favicon_path = os.path.join(self.shared_data.webdir, 'images/favicon.ico')
         self.logger.info(f"Serving favicon from {favicon_path}")
         try:
             with open(favicon_path, 'rb') as file:
