@@ -1,4 +1,5 @@
-#webapp.py 
+#webapp.py
+import base64
 import json
 import threading
 import http.server
@@ -16,10 +17,49 @@ from utils import WebUtils
 # Initialize the logger
 logger = Logger(name="webapp.py", level=logging.DEBUG)
 
+# Default credentials (used when shared_data.config doesn't override). The
+# username/password are also stored in config/shared_config.json so the user
+# can rotate them via the web UI.
+DEFAULT_WEB_USERNAME = "admin"
+DEFAULT_WEB_PASSWORD = "bjorn"
+DEFAULT_WEB_BIND_ADDRESS = "0.0.0.0"
+
 # Set the path to the favicon. NOTE: a leading slash on the second arg would
 # make os.path.join() discard webdir entirely (absolute path semantics), so
 # the favicon would resolve to /images/favicon.ico at the filesystem root.
 favicon_path = os.path.join(shared_data.webdir, 'images/favicon.ico')
+
+
+def _web_auth_config(shared):
+    """Read auth-related config from shared_data with safe defaults.
+
+    Returns a dict with: auth_enabled, username, password, bind_address.
+    Works whether shared.config is a real dict (production) or a MagicMock
+    (tests) — falls back to module-level defaults.
+    """
+    config = getattr(shared, "config", None) or {}
+    try:
+        auth_enabled = bool(config.get("web_auth_enabled", True))
+    except Exception:
+        auth_enabled = True
+    try:
+        username = config.get("web_username") or DEFAULT_WEB_USERNAME
+    except Exception:
+        username = DEFAULT_WEB_USERNAME
+    try:
+        password = config.get("web_password") or DEFAULT_WEB_PASSWORD
+    except Exception:
+        password = DEFAULT_WEB_PASSWORD
+    try:
+        bind_address = config.get("web_bind_address") or DEFAULT_WEB_BIND_ADDRESS
+    except Exception:
+        bind_address = DEFAULT_WEB_BIND_ADDRESS
+    return {
+        "auth_enabled": auth_enabled,
+        "username": username,
+        "password": password,
+        "bind_address": bind_address,
+    }
 
 class CustomHandler(http.server.SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
@@ -72,6 +112,37 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         self.send_header("Content-Security-Policy",
                          "default-src 'self' 'unsafe-inline'; img-src 'self' data:;")
 
+    def _check_auth(self):
+        """HTTP Basic Auth gate (WEB-8).
+
+        Returns True if the request is authorised (or auth is disabled).
+        Sends a 401 response and returns False otherwise. Must be called
+        at the very top of do_GET/do_POST, before any other work.
+        """
+        cfg = _web_auth_config(self.shared_data)
+        if not cfg["auth_enabled"]:
+            return True
+        header = self.headers.get("Authorization", "")
+        if header.startswith("Basic "):
+            try:
+                decoded = base64.b64decode(header[6:]).decode("utf-8", errors="replace")
+                user, _, pw = decoded.partition(":")
+                if user == cfg["username"] and pw == cfg["password"]:
+                    return True
+            except Exception:
+                pass
+        # Not authorised — send 401 with WWW-Authenticate so the browser
+        # shows its built-in Basic auth dialog.
+        self.send_response(401)
+        self.send_header("WWW-Authenticate", 'Basic realm="Bjorn"')
+        self.send_header("Content-type", "text/plain; charset=utf-8")
+        self.end_headers()
+        try:
+            self.wfile.write(b"Authentication required.\n")
+        except Exception:
+            pass
+        return False
+
     def send_gzipped_response(self, content, content_type):
         """Send a gzipped HTTP response."""
         gzipped_content = self.gzip_encode(content)
@@ -89,6 +160,9 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         self.send_gzipped_response(content, content_type)
 
     def do_GET(self):
+        # Auth gate (WEB-8). Applies to every GET including static assets.
+        if not self._check_auth():
+            return
         # Handle GET requests. Serve the HTML interface and the EPD image.
         if self.path == '/index.html' or self.path == '/':
             self.serve_file_gzipped(os.path.join(self.shared_data.webdir, 'index.html'), 'text/html')
@@ -158,6 +232,10 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             super().do_GET()
 
     def do_POST(self):
+        # Auth gate (WEB-8). Must precede CSRF check — unauthorised callers
+        # should not even learn whether a CSRF token exists.
+        if not self._check_auth():
+            return
         csrf_token = self.headers.get('X-CSRF-Token', '')
         if csrf_token != self.shared_data.csrf_token:
             self.send_response(403)
@@ -205,21 +283,42 @@ class WebThread(threading.Thread):
     Thread to run the web server serving the EPD display interface.
     """
     def __init__(self, handler_class=CustomHandler, port=8000):
-        super().__init__()
+        super().__init__(daemon=True)
         self.shared_data = shared_data
         self.port = port
         self.handler_class = handler_class
         self.httpd = None
 
+    def _bind_address(self):
+        """Read bind address from config at runtime (WEB-9).
+
+        Default '0.0.0.0' keeps Bjorn accessible on the LAN (the primary
+        use case). Users who want loopback-only can set
+        web_bind_address='127.0.0.1' in shared_config.json.
+        """
+        return _web_auth_config(self.shared_data)["bind_address"]
+
     def run(self):
         """
         Run the web server in a separate thread.
         """
+        # Soft enforcement (WEB-8): warn loudly if the default password is
+        # still in place. We do NOT block access — Basic Auth has no good
+        # 'force-change' flow — but the journal entry surfaces the issue.
+        cfg = _web_auth_config(self.shared_data)
+        if cfg["auth_enabled"] and cfg["password"] == DEFAULT_WEB_PASSWORD:
+            logger.warning(
+                "Web UI is using the default password 'bjorn'. "
+                "Rotate it via the config page (web_password key in "
+                "shared_config.json) before exposing Bjorn on untrusted "
+                "networks.")
+
         while not self.shared_data.webapp_should_exit:
             try:
-                with http.server.HTTPServer(("", self.port), self.handler_class) as httpd:
+                bind_addr = self._bind_address()
+                with http.server.HTTPServer((bind_addr, self.port), self.handler_class) as httpd:
                     self.httpd = httpd
-                    logger.info(f"Serving at port {self.port}")
+                    logger.info(f"Serving at {bind_addr}:{self.port}")
                     # Blocks until httpd.shutdown() is called from another
                     # thread (WebThread.shutdown). Previously the loop here
                     # picked requests off one at a time, which caused

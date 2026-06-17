@@ -137,7 +137,15 @@ class SharedData:
             "log_warning": True,
             "log_error": True,
             "log_critical": True,
-            
+
+            # Web UI security (WEB-8, WEB-9). Defaults keep the device
+            # functional on first boot (LAN-accessible, admin:bjorn) but
+            # the password should be rotated via the web UI's config page.
+            "web_auth_enabled": True,
+            "web_username": "admin",
+            "web_password": "bjorn",
+            "web_bind_address": "0.0.0.0",
+
             "startup_delay": 10,
             "web_delay": 2,
             "screen_delay": 1,

@@ -58,7 +58,13 @@ def mock_shared_data(monkeypatch):
     shared_mock.rdpfile = os.path.join(PROJECT_ROOT, 'data', 'output', 'crackedpwd', 'rdp.csv')
     shared_mock.webconsolelog = os.path.join(PROJECT_ROOT, 'data', 'logs', 'temp_log.txt')
     shared_mock.version = "test"
-    shared_mock.config = {"websrv": True}
+    shared_mock.config = {
+        "websrv": True,
+        "web_auth_enabled": False,
+        "web_username": "admin",
+        "web_password": "bjorn",
+        "web_bind_address": "0.0.0.0",
+    }
     shared_mock.web_delay = 2
     shared_mock.csrf_token = "test-csrf-token-12345"
 

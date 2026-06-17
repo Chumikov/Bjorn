@@ -41,6 +41,14 @@ def _make_web_thread():
     s.close()
     shared = MagicMock()
     shared.webapp_should_exit = False
+    # _web_auth_config() reads config keys; provide a real dict so the
+    # bind_address lookup returns a string, not a MagicMock.
+    shared.config = {
+        "web_auth_enabled": False,
+        "web_username": "admin",
+        "web_password": "bjorn",
+        "web_bind_address": "0.0.0.0",
+    }
     wt = WebThread.__new__(WebThread)
     threading.Thread.__init__(wt, daemon=True)
     wt.shared_data = shared
