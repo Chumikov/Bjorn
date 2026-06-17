@@ -365,7 +365,17 @@ class Display:
                 logger.error(f"An error occurred: {e}")
 
 def handle_exit_display(signum, frame, display_thread):
-    """Handle the exit signal and close the display."""
+    """Tear down the EPD hardware on exit.
+
+    ARCH-2: the previous version of this helper blocked on the display
+    thread and then terminated the process via the stdlib exit function.
+    The termination call raised SystemExit at the end of this helper,
+    which made any code in callers AFTER the call to this helper
+    unreachable (the bjorn/web thread joins in Bjorn.handle_exit were
+    dead). The thread-wait was also redundant with the caller's wait.
+    Both removed; this helper now ONLY tears down the EPD. Flag-based
+    cleanup happens in the main loop / process exit.
+    """
     global should_exit
     shared_data.display_should_exit = True
     logger.info("Exit signal received. Waiting for the main loop to finish...")
@@ -375,9 +385,6 @@ def handle_exit_display(signum, frame, display_thread):
             main_loop.epd.Dev_exit()
     except Exception as e:
         logger.error(f"Error while closing the display: {e}")
-    display_thread.join()
-    logger.info("Main loop finished. Clean exit.")
-    sys.exit(0)
 
 # Declare main_loop globally
 main_loop = None

@@ -72,7 +72,9 @@ class Bjorn:
                 self.shared_data.orchestrator_should_exit = False
                 self.shared_data.manual_mode = False
                 self.orchestrator = Orchestrator()
-                self.orchestrator_thread = threading.Thread(target=self.orchestrator.run)
+                # ARCH-1: mark as daemon so it doesn't block process exit.
+                self.orchestrator_thread = threading.Thread(
+                    target=self.orchestrator.run, daemon=True)
                 self.orchestrator_thread.start()
                 logger.info("Orchestrator thread started, automatic mode activated.")
             else:
@@ -112,25 +114,30 @@ class Bjorn:
     def start_display():
         """Start the display thread"""
         display = Display(shared_data)
-        display_thread = threading.Thread(target=display.run)
+        # ARCH-1: daemon=True so the thread doesn't block process exit if
+        # the main thread dies without running the cleanup path.
+        display_thread = threading.Thread(target=display.run, daemon=True)
         display_thread.start()
         return display_thread
 
 def handle_exit(sig, frame, display_thread, bjorn_thread, web_thread):
-    """Handles the termination of the main, display, and web threads."""
+    """Signal handler: set exit flags only. Cleanup happens in main loop.
+
+    ARCH-2: the previous version of this handler delegated to the
+    display-module helper which itself blocked on the display thread
+    and then terminated the process via the stdlib exit function. The
+    termination call inside that helper raised SystemExit, which meant
+    anything after the delegation below (including the bjorn/web
+    thread joins) was unreachable dead code. Blocking on a thread
+    from inside a signal handler also risks deadlock while the GIL is
+    held. This handler now ONLY sets the four exit flags; the main
+    loop is responsible for noticing them and tearing down.
+    """
     shared_data.should_exit = True
     shared_data.orchestrator_should_exit = True  # Ensure orchestrator stops
     shared_data.display_should_exit = True  # Ensure display stops
     shared_data.webapp_should_exit = True  # Ensure web server stops
-    handle_exit_display(sig, frame, display_thread)
-    if display_thread.is_alive():
-        display_thread.join()
-    if bjorn_thread.is_alive():
-        bjorn_thread.join()
-    if web_thread.is_alive():
-        web_thread.join()
-    logger.info("Main loop finished. Clean exit.")
-    sys.exit(0)  # Used sys.exit(0) instead of exit(0)
+    logger.info("Exit signal received; flags set. Main loop will clean up.")
 
 
 
@@ -149,7 +156,9 @@ if __name__ == "__main__":
         logger.info("Starting Bjorn thread...")
         bjorn = Bjorn(shared_data)
         shared_data.bjorn_instance = bjorn  # Assigner l'instance de Bjorn à shared_data
-        bjorn_thread = threading.Thread(target=bjorn.run)
+        # ARCH-1: daemon=True so this thread doesn't block process exit
+        # if the main thread crashes before installing the signal handler.
+        bjorn_thread = threading.Thread(target=bjorn.run, daemon=True)
         bjorn_thread.start()
 
         if shared_data.config["websrv"]:
