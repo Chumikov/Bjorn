@@ -105,7 +105,7 @@ sudo systemctl restart systemd-journald
 
 ```bash
 # Скачать и запустить установщик
-wget https://raw.githubusercontent.com/infinition/Bjorn/refs/heads/main/install_bjorn.sh
+wget https://raw.githubusercontent.com/Chumikov/Bjorn/refs/heads/main/install_bjorn.sh
 sudo chmod +x install_bjorn.sh && sudo ./install_bjorn.sh
 # Выберите вариант 1 для автоматической установки. Это может занять некоторое время, так как будет установлено множество пакетов и модулей. Необходимо выполнить перезагрузку по завершении.
 ```
@@ -184,8 +184,8 @@ Bjorn задуман как кузница инструментов, управ�
   - Документируйте шаги воспроизведения.
   - Предоставляйте логи и контекст.
 
-- **Автор**: __infinition__
-- **GitHub**: [infinition/Bjorn](https://github.com/infinition/Bjorn)
+- **Автор**: __infinition__ (оригинал), Chumikov Sec (форк)
+- **GitHub**: [Chumikov/Bjorn](https://github.com/Chumikov/Bjorn) (форк), [infinition/Bjorn](https://github.com/infinition/Bjorn) (upstream)
 
 ## 🌠 Звёздные наблюдатели
 

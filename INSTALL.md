@@ -50,7 +50,7 @@ https://www.raspberrypi.com/software/
 
 ```bash
 # Скачать и запустить установщик
-wget https://raw.githubusercontent.com/infinition/Bjorn/refs/heads/main/install_bjorn.sh
+wget https://raw.githubusercontent.com/Chumikov/Bjorn/refs/heads/main/install_bjorn.sh
 sudo chmod +x install_bjorn.sh
 sudo ./install_bjorn.sh
 # Выберите вариант 1 для автоматической установки. Это может занять некоторое время, так как будет установлено множество пакетов и модулей. Необходимо выполнить перезагрузку по завершении.
@@ -112,7 +112,7 @@ sudo nmap --script-updatedb
 ```bash
 # Клонирование репозитория Bjorn
 cd /home/bjorn
-git clone https://github.com/infinition/Bjorn.git
+git clone https://github.com/Chumikov/Bjorn.git
 cd Bjorn
 
 # Установка Python-зависимостей
