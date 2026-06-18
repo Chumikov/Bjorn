@@ -341,6 +341,61 @@ sudo rm -rf /home/bjorn/Bjorn/config/*.json \
 3. Соблюдайте этические нормы.
 4. Документируйте тестовые случаи.
 
+### 🔧 Git executable bit
+
+Любой скрипт, который запускается через `Exec*` в systemd unit или напрямую
+через `./script.sh`, **должен** иметь executable bit зафиксированный в git
+index. Иначе `git checkout` / `git pull` сбросит его в `100644`, и systemd
+упадёт с `status=203/EXEC`.
+
+```bash
+# Установить bit один раз (git будет хранить его в index):
+git update-index --chmod=+x kill_port_8000.sh
+git update-index --chmod=+x wifi_fix.sh
+git update-index --chmod=+x Bjorn.py
+
+# Проверка: первая колонка должна быть 100755, не 100644
+git ls-files -s kill_port_8000.sh Bjorn.py
+```
+
+В v1.3.2 этот шаг был пропущен — `install_bjorn.sh` выставлял `chmod +x`
+при установке, но после `git pull` бит терялся, и сервис падал на старте.
+
+### 🧵 Threading lifecycle
+
+Bjorn — длительно живущий процесс с 3-4 рабочими потоками. Главное правило:
+
+**Main thread обязан иметь wait point (join/event/loop).**
+
+Если добавить новый поток, выбирай daemon/non-daemon осознанно:
+- **non-daemon** — prevent exit процесса. Использовать для core workers
+  (`display_thread`, `bjorn_thread`, `orchestrator_thread`, `web_thread`).
+- **daemon** — умирает вместе с процессом. Только для cleanup helpers.
+
+**Опасный паттерн** (вызывает crash-loop на реальном железе):
+```python
+# ❌ НЕ ДЕЛАЙ ТАК
+bjorn_thread = threading.Thread(target=bjorn.run, daemon=True)
+bjorn_thread.start()
+# ... main thread выходит из __main__ → процесс завершается
+# systemd Restart=always переподнимает сервис каждые ~8 секунд
+```
+
+**Правильный паттерн**:
+```python
+# ✅ Non-daemon + main wait
+bjorn_thread = threading.Thread(target=bjorn.run)  # non-daemon
+bjorn_thread.start()
+# ...
+bjorn_thread.join()  # main блокируется до выхода worker
+```
+
+CI-тесты (`pytest`) **не ловят** threading lifecycle баги — они проявляются
+только при реальном запуске процесса. Source-level checks в
+`tests/test_runtime_smoke.py` ловят самые частые регрессии (отсутствие
+join, daemon на core потоке), но финальное тестирование на реальном RPi
+обязательно для любого изменения в `Bjorn.py` / `webapp.py`.
+
 ## 💻 Веб-интерфейс
 
 - **Доступ**: `http://[ip-устройства]:8000`

@@ -328,6 +328,14 @@ setup_bjorn() {
     chown -R $BJORN_USER:$BJORN_USER /home/$BJORN_USER/Bjorn
     chmod -R 755 /home/$BJORN_USER/Bjorn
     
+    # Enable persistent journald so logs survive reboots.
+    # Default RPi OS uses volatile /run/log/journal which is wiped on
+    # every boot — that hides crash-loop tracebacks and makes diagnosis
+    # of "screen doesn't turn on" issues much harder.
+    mkdir -p /var/log/journal
+    systemctl restart systemd-journald 2>/dev/null || true
+    log "INFO" "Persistent journald enabled (logs in /var/log/journal)"
+    
     # Add bjorn user to necessary groups
     usermod -a -G spi,gpio,i2c $BJORN_USER
     check_success "Added bjorn user to required groups"
