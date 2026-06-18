@@ -189,10 +189,6 @@ Bjorn задуман как кузница инструментов, управ�
 - **Автор**: __infinition__ (оригинал), Chumikov Sec (форк)
 - **GitHub**: [Chumikov/Bjorn](https://github.com/Chumikov/Bjorn) (форк), [infinition/Bjorn](https://github.com/infinition/Bjorn) (upstream)
 
-## 🌠 Звёздные наблюдатели
-
-[![Star History Chart](https://api.star-history.com/svg?repos=infinition/bjorn&type=Date)](https://star-history.com/#infinition/bjorn&Date)
-
 ---
 
 ## 📜 Лицензия
