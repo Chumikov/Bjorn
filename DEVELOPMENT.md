@@ -197,8 +197,8 @@ Bjorn/
 
 **Пример предварительного просмотра:**
 
-![netkb1](https://github.com/infinition/Bjorn/assets/37984399/f641a565-2765-4280-a7d7-5b25c30dcea5)
-![netkb2](https://github.com/infinition/Bjorn/assets/37984399/f08114a2-d7d1-4f50-b1c4-a9939ba66056)
+![netkb1](docs/images/netkb-preview-1.png)
+![netkb2](docs/images/netkb-preview-2.png)
 
 #### Результаты сканирования
 
@@ -207,7 +207,7 @@ Bjorn/
 
 **Пример:**
 
-![Scan result](https://github.com/infinition/Bjorn/assets/37984399/eb4a313a-f90c-4c43-b699-3678271886dc)
+![Scan result](docs/images/scan-result.jpg)
 
 #### Живой статус (livestatus.csv)
 
