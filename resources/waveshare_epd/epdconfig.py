@@ -279,7 +279,26 @@ output, _ = process.communicate()
 if sys.version_info[0] == 2:
     output = output.decode(sys.stdout.encoding)
 
-if "Raspberry" in output:
+# Platform detection: RPi OS Bookworm (2024+ firmware) may not include
+# "Raspberry" in /proc/cpuinfo on some boards (e.g. RPi 5 with BCM2712).
+# Use multiple signals to stay robust across firmware revisions:
+#   1. /proc/cpuinfo contains "Raspberry" (legacy detection, all old boards)
+#   2. /etc/rpi-issue exists (every official RPi OS image since pi-gen)
+#   3. /proc/device-tree/model starts with "Raspberry Pi" (new mainline)
+def _is_raspberry_pi():
+    if "Raspberry" in output:
+        return True
+    if os.path.exists('/etc/rpi-issue'):
+        return True
+    try:
+        with open('/proc/device-tree/model', 'r') as f:
+            if 'Raspberry Pi' in f.read():
+                return True
+    except (OSError, IOError):
+        pass
+    return False
+
+if _is_raspberry_pi():
     implementation = RaspberryPi()
 elif os.path.exists('/sys/bus/platform/drivers/gpio-x3'):
     implementation = SunriseX3()
