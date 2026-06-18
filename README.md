@@ -54,11 +54,11 @@ e-Paper HAT дисплей и веб-интерфейс обеспечивают
 
 ![image](https://github.com/user-attachments/assets/3980ec5f-a8fc-4848-ab25-4356e0529639)
 
-- Установленная Raspberry Pi OS.
+- Установленная Raspberry Pi OS (Legacy, 32-bit).
     - Стабильная:
       - Система: 32-бит
-      - Версия ядра: 6.6
-      - Версия Debian: 12 (bookworm) '2024-10-22-raspios-bookworm-armhf-lite'
+      - Версия ядра: 6.12
+      - Версия Debian: 12 (bookworm) '2026-04-13-raspios-bookworm-armhf-lite'
 - Имя пользователя и hostname установлены в `bjorn`.
 - e-Paper HAT 2.13 дюйма подключён к GPIO-пинам.
 
@@ -68,13 +68,23 @@ e-Paper HAT дисплей и веб-интерфейс обеспечивают
 
 Проект не разрабатывался специально для Raspberry Pi Zero W2 64-бит, но несколько отзывов подтвердили, что установка работает корректно.
 
-- Установленная Raspberry Pi OS.
+- Установленная Raspberry Pi OS (Legacy, 64-bit).
     - Стабильная:
       - Система: 64-бит
-      - Версия ядра: 6.6
-      - Версия Debian: 12 (bookworm) '2024-10-22-raspios-bookworm-arm64-lite'
+      - Версия ядра: 6.12
+      - Версия Debian: 12 (bookworm) '2026-04-13-raspios-bookworm-arm64-lite'
 - Имя пользователя и hostname установлены в `bjorn`.
 - e-Paper HAT 2.13 дюйма подключён к GPIO-пинам.
+
+### 📋 Для RPi 5 (64-бит)
+
+- Установленная Raspberry Pi OS (Legacy, 64-bit).
+    - Система: 64-bit (ARM64/aarch64; 32-bit не поддерживается на BCM2712)
+    - Версия ядра: 6.12
+    - Версия Debian: 12 (bookworm) '2026-04-13-raspios-bookworm-arm64-lite'
+- Имя пользователя и hostname установлены в `bjorn`.
+- e-Paper HAT 2.13 дюйма подключён к GPIO-пинам.
+- **Минимальная версия Bjorn**: v1.3.1+ (мульти-источник platform detection для BCM2712).
 
 
 На данный момент протестированы и поддерживаются экраны v2 и v4.
@@ -84,14 +94,25 @@ e-Paper HAT дисплей и веб-интерфейс обеспечивают
 
 | Плата | Статус | Минимальная версия Bjorn |
 |---|---|---|
-| RPi Zero W (BCM2835) | ✅ Полная поддержка | v1.0.0+ |
-| RPi Zero W2 (BCM2837) | ✅ Полная поддержка | v1.0.0+ |
-| RPi 5 (BCM2712) | ✅ Поддержка | **v1.3.1+** |
+| RPi Zero W (BCM2835) | ✅ Полная поддержка (upstream) | v1.0.0+ |
+| RPi Zero W2 (BCM2837) | ✅ Полная поддержка (upstream) | v1.0.0+ |
+| RPi 5 (BCM2712) | ✅ Поддержка (протестировано в форке) | **v1.3.1+** |
 
 **Важно для RPi 5**: после `apt full-upgrade` на RPi OS Bookworm 2024+
 файл `/proc/cpuinfo` больше не содержит строку "Raspberry". Версии Bjorn
 до v1.3.1 падают на определении платы. Используй v1.3.3+ для
 гарантированной совместимости.
+
+### ⚠️ Важно про Debian Trixie (13)
+
+Текущая стабильная RPi OS основана на Debian 13 (Trixie, образ
+`2026-04-21-raspios-trixie-*`). **Bjorn пока НЕ поддерживает Trixie**:
+пакет `libatlas-base-dev` удалён в Trixie, и `install_bjorn.sh` падает
+на apt-установке.
+
+Используйте **RPi OS Legacy** (Bookworm) пока не выйдет Bjorn v1.4.0 с
+адаптацией под Trixie. Скачать: [raspberrypi.com/software/operating-systems](https://www.raspberrypi.com/software/operating-systems/)
+→ "Raspberry Pi OS (Legacy, 64-bit)" → "Raspberry Pi OS (Legacy) Lite".
 
 **Persistent journal рекомендуется** для диагностики crash-loop-ов (по
 умолчанию RPi OS использует volatile journal, который теряет логи между
