@@ -207,3 +207,39 @@ class TestBjornServiceReferences:
         assert os.path.isfile("wifi_fix.sh"), (
             "wifi_fix.sh must exist in repo root — it is invoked during "
             "install and on boot.")
+
+
+# ---------------------------------------------------------------------------
+# Installer apt dependencies — guards against silent CLI tool removal
+# ---------------------------------------------------------------------------
+
+
+class TestInstallerDeps:
+    """Verify install_bjorn.sh apt list includes CLI tools the Python code
+    shells out to. Without these the runtime fails with FileNotFoundError
+    even though pip install succeeded.
+
+    Each entry below is a CLI tool invoked via subprocess in the Python
+    code. If someone refactors the packages array and accidentally drops
+    one, this test fails with a clear message pointing at the call site.
+    """
+
+    @pytest.mark.parametrize("pkg,reason", [
+        ("smbclient",       "actions/smb_connector.py:128 (smbclient -L fallback)"),
+        ("wireless-tools",  "utils.py:532,538 (iwlist scan, iwgetid -r)"),
+        ("nmap",            "scanning.py + nmap_vuln_scanner.py (already required)"),
+        ("lsof",            "bjorn.service ExecStartPost FD monitor (already required)"),
+    ])
+    def test_apt_package_listed(self, pkg, reason):
+        """Each CLI tool invoked via subprocess must have its apt package
+        declared in install_bjorn.sh's packages array."""
+        with open("install_bjorn.sh", encoding="utf-8") as f:
+            src = f.read()
+        # The packages array uses double-quoted strings; check exact match
+        # to avoid partial hits like 'lsof' inside 'libopenblas'.
+        pattern = f'"{pkg}"'
+        assert pattern in src, (
+            f"install_bjorn.sh must include {pattern} in its apt packages "
+            f"list. Reason: {reason}. The Python code shells out to this "
+            f"CLI tool via subprocess; without the apt package the runtime "
+            f"fails with FileNotFoundError even though pip install succeeded.")

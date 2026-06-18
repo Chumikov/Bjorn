@@ -232,6 +232,8 @@ install_dependencies() {
         "libi2c-dev"
         "libatlas-base-dev"
         "build-essential"
+        "smbclient"          # SMB fallback path в smb_connector.py: smbclient -L
+        "wireless-tools"     # iwgetid / iwlist для /scan_wifi endpoint
     )
     
     # Install packages
