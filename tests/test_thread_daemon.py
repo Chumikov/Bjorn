@@ -1,37 +1,32 @@
-"""ARCH-1, ARCH-2: thread daemon flag + signal handler cleanup.
+"""ARCH-1, ARCH-2, ARCH-3 (v1.3.3): thread lifecycle + signal handler.
 
-ARCH-1: all three top-level threads (display, bjorn, web) were created
-without daemon=True. A non-daemon thread blocks interpreter exit if the
-main thread dies without going through the cleanup path (signal handler
-crash, OOM kill, etc.). All three now use daemon=True.
+ARCH-1 (v1.3.0, REVERTED in v1.3.3): marked all top-level threads
+daemon=True. On real hardware this caused a crash-loop: main thread
+exited the __main__ block immediately after registering signal handlers
+(no join/wait), and since all worker threads were daemon, the process
+exited too. systemd Restart=always re-spawned the service every ~8s.
 
-ARCH-2: Bjorn.handle_exit signal handler called handle_exit_display(),
-which ended with display_thread.join() + sys.exit(0). The sys.exit
-raised SystemExit at the END of handle_exit_display, making the
-bjorn_thread/web_thread joins in handle_exit unreachable. Worse,
-calling join() from inside a signal handler risks deadlock (the signal
-is delivered to the main thread, which is then expected to wait on
-another thread while the GIL is held). The handler now only sets flags;
-cleanup happens in the main loop / process exit. handle_exit_display
-also drops its own join+sys.exit.
+v1.3.3 reverts ARCH-1: display_thread, bjorn_thread, orchestrator_thread
+and WebThread are all non-daemon (matching the original v1.2.0 behaviour).
+The __main__ block now ends with bjorn_thread.join() so the main thread
+blocks until the core worker exits — providing a clean shutdown path
+without the crash-loop.
+
+ARCH-2 (v1.3.0, kept): handle_exit signal handler must not call join()
+or sys.exit(). Set flags only.
 """
 import ast
-import inspect
-import sys
-import threading
-from unittest.mock import MagicMock
-
 import pytest
 
 
 # ---------------------------------------------------------------------------
-# ARCH-1
+# ARCH-1 (v1.3.3): non-daemon worker threads
 # ---------------------------------------------------------------------------
 
 
-class TestDaemonThreads:
-    def test_display_thread_created_with_daemon(self):
-        """Source-level: start_display must pass daemon=True."""
+class TestNonDaemonThreads:
+    def test_display_thread_is_non_daemon(self):
+        """start_display must NOT pass daemon=True (caused crash-loop)."""
         with open("Bjorn.py", encoding="utf-8") as f:
             src = f.read()
         start = src.index("def start_display")
@@ -41,49 +36,64 @@ class TestDaemonThreads:
         if end == -1:
             end = len(src)
         method_src = src[start:end]
-        assert "daemon=True" in method_src, (
-            f"start_display must create the thread with daemon=True (ARCH-1). "
+        assert "daemon=True" not in method_src, (
+            f"start_display must NOT use daemon=True (v1.3.3 revert of "
+            f"ARCH-1; daemon threads caused the process to exit immediately "
+            f"on real hardware). Method:\n{method_src}")
+
+    def test_bjorn_thread_is_non_daemon(self):
+        with open("Bjorn.py", encoding="utf-8") as f:
+            src = f.read()
+        assert "bjorn_thread = threading.Thread(target=bjorn.run)\n" in src, (
+            "bjorn_thread must be created WITHOUT daemon=True (v1.3.3). "
+            "It's the core worker; daemonising it caused crash-loop.")
+        assert "bjorn_thread = threading.Thread(target=bjorn.run, daemon=True)" not in src, (
+            "Found daemon=True on bjorn_thread — must be removed (v1.3.3).")
+
+    def test_orchestrator_thread_is_non_daemon(self):
+        with open("Bjorn.py", encoding="utf-8") as f:
+            src = f.read()
+        # Find start_orchestrator body
+        start = src.index("def start_orchestrator")
+        end = src.find("\n    def ", start + 20)
+        if end == -1:
+            end = len(src)
+        method_src = src[start:end]
+        assert "daemon=True" not in method_src, (
+            f"orchestrator_thread must NOT be daemon (v1.3.3). "
             f"Method:\n{method_src}")
 
-    def test_bjorn_thread_created_with_daemon(self):
-        """Source-level: __main__ block must pass daemon=True to bjorn_thread."""
-        with open("Bjorn.py", encoding="utf-8") as f:
-            src = f.read()
-        # Find the bjorn_thread creation
-        assert "bjorn_thread = threading.Thread(target=bjorn.run, daemon=True)" in src, (
-            "bjorn_thread must be created with daemon=True (ARCH-1).")
-
-    def test_web_thread_is_daemon(self):
-        """Source-level: WebThread.__init__ must call super().__init__(daemon=True)."""
+    def test_web_thread_is_non_daemon(self):
+        """WebThread.__init__ must NOT call super().__init__(daemon=True)."""
         with open("webapp.py", encoding="utf-8") as f:
             src = f.read()
-        assert "super().__init__(daemon=True)" in src, (
-            "WebThread must call super().__init__(daemon=True) (ARCH-1).")
+        # Find WebThread.__init__ body
+        start = src.index("class WebThread")
+        end = src.find("def _bind_address", start)
+        method_src = src[start:end]
+        assert "super().__init__(daemon=True)" not in method_src, (
+            f"WebThread must NOT use super().__init__(daemon=True) (v1.3.3). "
+            f"Section:\n{method_src}")
+        assert "super().__init__()" in method_src, (
+            "WebThread.__init__ must call super().__init__() (non-daemon)")
 
-    def test_no_non_daemon_thread_creation_at_top_level(self):
-        """AST: in Bjorn.py, every threading.Thread() call at top-level
-        (inside __main__ or classmethods) must include daemon=True."""
+    def test_main_block_joins_bjorn_thread(self):
+        """The __main__ block must end with bjorn_thread.join() so the
+        main thread doesn't exit while worker threads are still running.
+        Without this join, even non-daemon threads would print 'Starting
+        the web server...' and exit before the service does any work."""
         with open("Bjorn.py", encoding="utf-8") as f:
-            tree = ast.parse(f.read())
-        for node in ast.walk(tree):
-            if (isinstance(node, ast.Call)
-                    and isinstance(node.func, ast.Attribute)
-                    and node.func.attr == "Thread"
-                    and isinstance(node.func.value, ast.Name)
-                    and node.func.value.id == "threading"):
-                # Look for daemon keyword
-                has_daemon = any(
-                    kw.arg == "daemon" and isinstance(kw.value, ast.Constant)
-                    and kw.value.value is True
-                    for kw in node.keywords
-                )
-                assert has_daemon, (
-                    f"threading.Thread() at line {node.lineno} of Bjorn.py "
-                    f"must include daemon=True (ARCH-1).")
+            src = f.read()
+        # Find the __main__ block
+        main_start = src.index('if __name__ == "__main__":')
+        main_body = src[main_start:]
+        assert "bjorn_thread.join()" in main_body, (
+            "__main__ must call bjorn_thread.join() so main thread blocks "
+            "until the core worker exits (prevents the v1.3.0 crash-loop).")
 
 
 # ---------------------------------------------------------------------------
-# ARCH-2
+# ARCH-2 (kept): signal handler sets flags only
 # ---------------------------------------------------------------------------
 
 
@@ -92,7 +102,6 @@ class TestSignalHandlerNoJoinNoExit:
         """Slice Bjorn.handle_exit method body, bounded by the next
         top-level def OR the __main__ block."""
         start = src.index("def handle_exit(")
-        # End at the next top-level def OR __main__ block (whichever first)
         end_candidates = []
         for marker in ["\ndef ", "\nif __name__"]:
             pos = src.find(marker, start + 20)
@@ -102,8 +111,8 @@ class TestSignalHandlerNoJoinNoExit:
         return src[start:end]
 
     def test_handle_exit_does_not_call_join(self):
-        """AST: Bjorn.handle_exit must not call .join() — signal handlers
-        must not block on thread joins (deadlock risk)."""
+        """handle_exit must not call .join() — signal handlers must not
+        block on thread joins (deadlock risk)."""
         with open("Bjorn.py", encoding="utf-8") as f:
             src = f.read()
         method_src = self._handle_exit_body(src)
@@ -111,7 +120,6 @@ class TestSignalHandlerNoJoinNoExit:
             f"handle_exit must not call .join() (ARCH-2). Method:\n{method_src}")
 
     def test_handle_exit_does_not_call_sys_exit(self):
-        """AST: Bjorn.handle_exit must not call sys.exit()."""
         with open("Bjorn.py", encoding="utf-8") as f:
             src = f.read()
         method_src = self._handle_exit_body(src)
@@ -119,8 +127,6 @@ class TestSignalHandlerNoJoinNoExit:
             f"handle_exit must not call sys.exit (ARCH-2). Method:\n{method_src}")
 
     def test_handle_exit_does_not_call_handle_exit_display(self):
-        """handle_exit must not delegate to handle_exit_display (which used
-        to do its own join+sys.exit)."""
         with open("Bjorn.py", encoding="utf-8") as f:
             src = f.read()
         method_src = self._handle_exit_body(src)
@@ -129,13 +135,11 @@ class TestSignalHandlerNoJoinNoExit:
             f"Method:\n{method_src}")
 
     def test_handle_exit_display_does_not_sys_exit(self):
-        """AST: handle_exit_display must not call sys.exit (the previous
-        sys.exit(0) at the end raised SystemExit, making any caller's
-        subsequent code unreachable)."""
+        """display.handle_exit_display must not call sys.exit (was making
+        caller's subsequent code unreachable via SystemExit)."""
         with open("display.py", encoding="utf-8") as f:
             src = f.read()
         start = src.index("def handle_exit_display(")
-        # End at the next top-level statement
         end = src.find("\n# ", start + 20)
         if end == -1:
             end = src.find("\n\n", start + 20)
@@ -147,9 +151,6 @@ class TestSignalHandlerNoJoinNoExit:
             f"Method:\n{method_src}")
 
     def test_handle_exit_display_does_not_join(self):
-        """handle_exit_display must not call display_thread.join() (the
-        join is the caller's responsibility, and the previous join here
-        was dead-redundant with the one in Bjorn.handle_exit)."""
         with open("display.py", encoding="utf-8") as f:
             src = f.read()
         start = src.index("def handle_exit_display(")

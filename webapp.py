@@ -283,7 +283,11 @@ class WebThread(threading.Thread):
     Thread to run the web server serving the EPD display interface.
     """
     def __init__(self, handler_class=CustomHandler, port=8000):
-        super().__init__(daemon=True)
+        # WebThread is non-daemon — the service stays alive while it runs.
+        # Reverted ARCH-1 daemon=True; combined with daemon bjorn_thread
+        # it caused the whole process to exit immediately after main
+        # finished setting up signal handlers (crash-loop on RPi).
+        super().__init__()
         self.shared_data = shared_data
         self.port = port
         self.handler_class = handler_class

@@ -72,9 +72,10 @@ class Bjorn:
                 self.shared_data.orchestrator_should_exit = False
                 self.shared_data.manual_mode = False
                 self.orchestrator = Orchestrator()
-                # ARCH-1: mark as daemon so it doesn't block process exit.
+                # orchestrator_thread is non-daemon — it's a core worker
+                # thread (started by the bjorn_thread). Reverted ARCH-1.
                 self.orchestrator_thread = threading.Thread(
-                    target=self.orchestrator.run, daemon=True)
+                    target=self.orchestrator.run)
                 self.orchestrator_thread.start()
                 logger.info("Orchestrator thread started, automatic mode activated.")
             else:
@@ -114,9 +115,12 @@ class Bjorn:
     def start_display():
         """Start the display thread"""
         display = Display(shared_data)
-        # ARCH-1: daemon=True so the thread doesn't block process exit if
-        # the main thread dies without running the cleanup path.
-        display_thread = threading.Thread(target=display.run, daemon=True)
+        # NOTE: display_thread is non-daemon on purpose. The previous
+        # attempt to mark all worker threads as daemons caused a crash-
+        # -loop on real hardware: the main thread exited immediately
+        # after registering signal handlers (no join/wait), and daemon
+        # threads don't prevent process exit.
+        display_thread = threading.Thread(target=display.run)
         display_thread.start()
         return display_thread
 
@@ -156,9 +160,11 @@ if __name__ == "__main__":
         logger.info("Starting Bjorn thread...")
         bjorn = Bjorn(shared_data)
         shared_data.bjorn_instance = bjorn  # Assigner l'instance de Bjorn à shared_data
-        # ARCH-1: daemon=True so this thread doesn't block process exit
-        # if the main thread crashes before installing the signal handler.
-        bjorn_thread = threading.Thread(target=bjorn.run, daemon=True)
+        # bjorn_thread is non-daemon — it's the core worker thread whose
+        # exit (via shared_data.should_exit) drives the service lifecycle.
+        # Daemon-ising it caused the process to exit immediately after
+        # main finished registering signal handlers (crash-loop on RPi).
+        bjorn_thread = threading.Thread(target=bjorn.run)
         bjorn_thread.start()
 
         if shared_data.config["websrv"]:
@@ -167,6 +173,20 @@ if __name__ == "__main__":
 
         signal.signal(signal.SIGINT, lambda sig, frame: handle_exit(sig, frame, display_thread, bjorn_thread, web_thread))
         signal.signal(signal.SIGTERM, lambda sig, frame: handle_exit(sig, frame, display_thread, bjorn_thread, web_thread))
+
+        # Main thread waits for the core worker (bjorn_thread) so the
+        # process doesn't exit while it's running. When bjorn_thread
+        # returns (because shared_data.should_exit was set by signal
+        # handler or by an internal exit condition), main proceeds.
+        logger.info("Bjorn main thread waiting for bjorn_thread to exit...")
+        bjorn_thread.join()
+        logger.info("bjorn_thread exited; cleaning up display and web threads...")
+        if display_thread.is_alive():
+            display_thread.join(timeout=10)
+        if web_thread.is_alive():
+            web_thread.shutdown()
+            web_thread.join(timeout=10)
+        logger.info("Main loop finished. Clean exit.")
 
     except Exception as e:
         logger.error(f"An exception occurred during thread start: {e}")
