@@ -24,6 +24,10 @@ BJORN_PATH="/home/${BJORN_USER}/Bjorn"
 CURRENT_STEP=0
 TOTAL_STEPS=8
 
+# Source repository. Change this single line if forking or moving to a
+# custom domain; everything below uses $REPO_URL for the clone step.
+REPO_URL="https://github.com/Chumikov/Bjorn.git"
+
 if [[ "$1" == "--help" ]]; then
     echo "Usage: sudo ./install_bjorn.sh"
     echo "Make sure you have the necessary permissions and that all dependencies are met."
@@ -302,7 +306,7 @@ setup_bjorn() {
     else
         # No existing directory, proceed with clone
         log "INFO" "Cloning BJORN repository"
-        git clone https://github.com/infinition/Bjorn.git
+        git clone "$REPO_URL"
         check_success "Cloned BJORN repository"
     fi
 
