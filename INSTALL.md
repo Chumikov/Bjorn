@@ -20,8 +20,8 @@ https://www.raspberrypi.com/software/
 - Установленная Raspberry Pi OS.
     - Стабильная:
       - Система: 32-бит
-      - Версия ядра: 6.6
-      - Версия Debian: 12 (bookworm) '2024-10-22-raspios-bookworm-armhf-lite'
+      - Версия ядра: 6.12
+      - Версия Debian: 12 (bookworm) '2026-04-13-raspios-bookworm-armhf-lite'
 - Имя пользователя и hostname установлены в `bjorn`.
 - e-Paper HAT 2.13 дюйма подключён к GPIO-пинам.
 
@@ -34,10 +34,20 @@ https://www.raspberrypi.com/software/
 - Установленная Raspberry Pi OS.
     - Стабильная:
       - Система: 64-бит
-      - Версия ядра: 6.6
-      - Версия Debian: 12 (bookworm) '2024-10-22-raspios-bookworm-arm64-lite'
+      - Версия ядра: 6.12
+      - Версия Debian: 12 (bookworm) '2026-04-13-raspios-bookworm-arm64-lite'
 - Имя пользователя и hostname установлены в `bjorn`.
 - e-Paper HAT 2.13 дюйма подключён к GPIO-пинам.
+
+### 📌 Предварительные требования для RPi 5 (64-бит, BCM2712)
+
+- Установленная Raspberry Pi OS (Legacy, 64-bit).
+    - Система: 64-bit (ARM64/aarch64; 32-bit не поддерживается на BCM2712)
+    - Версия ядра: 6.12
+    - Версия Debian: 12 (bookworm) '2026-04-13-raspios-bookworm-arm64-lite'
+- Имя пользователя и hostname установлены в `bjorn`.
+- e-Paper HAT 2.13 дюйма подключён к GPIO-пинам.
+- **Минимальная версия Bjorn**: v1.3.1+ (мульти-источник platform detection для BCM2712). Рекомендуется v1.3.4+.
 
 
 
@@ -96,9 +106,11 @@ sudo apt-get update && sudo apt-get upgrade -y
   libopenblas-dev \
   bluez-tools \
   bluez \
-  dhcpcd5 \
-  bridge-utils \
-  python3-pil
+   dhcpcd5 \
+   bridge-utils \
+   python3-pil \
+   smbclient \
+   wireless-tools
 
 
 # Обновление базы скриптов Nmap
@@ -138,6 +150,27 @@ sudo vi /home/bjorn/Bjorn/config/shared_config.json
 
 Нажмите `Esc` для выхода из режима вставки
 Введите `:wq` и нажмите `Enter` для сохранения и выхода
+
+##### 3.2: Веб-аутентификация (Basic Auth)
+
+Веб-интерфейс на порту `8000` защищён HTTP Basic Auth. Учётные данные по
+умолчанию (сменим пароль перед выставлением в сеть):
+
+- **Логин:** `admin`
+- **Пароль:** `bjorn`
+
+Чтобы сменить пароль или отключить аутентификацию, отредактируйте
+`/home/bjorn/Bjorn/config/shared_config.json`:
+
+```json
+"web_auth_enabled": true,
+"web_username": "admin",
+"web_password": "свой-надёжный-пароль",
+"web_bind_address": "0.0.0.0"
+```
+
+Подробности — в [Политике безопасности](SECURITY.md). Сменить пароль можно
+также через страницу конфигурации в самом веб-интерфейсе.
 
 #### Шаг 4: Настройка лимитов файловых дескрипторов
 

@@ -88,7 +88,7 @@ sudo journalctl -u bjorn.service --no-pager | tail -50
   Лечится `sudo chmod +x /home/bjorn/Bjorn/kill_port_8000.sh` или
   обновлением до v1.3.2+.
 - `ImportError` / `SyntaxError` → проблема в коде. Обновись до последнего
-  релиза: `cd /home/bjorn/Bjorn && git fetch --tags && git checkout v1.3.3`.
+  релиза: `cd /home/bjorn/Bjorn && git fetch --tags && git checkout v1.3.4`.
 - Сервис не пишет ничего → падает ДО Python, смотри следующий шаг.
 
 **Шаг 2. Проверь последний Bjorn-лог**:
@@ -147,6 +147,38 @@ grep Raspberry /proc/cpuinfo    # на RPi 5 с новой firmware - пусто
 
 **Fix**: обновиться до v1.3.1+, где добавлен multi-source platform
 detection (`/proc/cpuinfo` + `/etc/rpi-issue` + `/proc/device-tree/model`).
+
+### 🌐 Веб-интерфейс
+
+#### Не могу войти — браузер запрашивает логин/пароль (401)
+
+Веб-интерфейс защищён **HTTP Basic Auth** (с v1.3.0). Учётные данные по
+умолчанию:
+
+- **Логин:** `admin`
+- **Пароль:** `bjorn`
+
+Сменить пароль или отключить аутентификацию — в
+`config/shared_config.json` (ключи `web_username` / `web_password` /
+`web_auth_enabled`) либо через страницу конфигурации. Подробности в
+[SECURITY.md](SECURITY.md).
+
+#### Нет CSS, иконок, вёрстки (страница «голая»)
+
+Симптом: веб-интерфейс грузится, но без стилей и иконок; в консоли браузера
+видны `404` на `/css/styles.css`, `/images/...`, `/scripts/...`.
+
+**Причина**: версии до v1.3.4 ссылались на ассеты с избыточным префиксом
+`web/`, который после WEB-2 резолвился в несуществующий двойной путь.
+
+**Fix**: обновиться до v1.3.4:
+```bash
+cd /home/bjorn/Bjorn
+git fetch --tags && git checkout v1.3.4
+```
+
+Проверка: `curl -u admin:bjorn http://[ip]:8000/css/styles.css` должен
+вернуть CSS (HTTP 200), а не 404.
 
 ---
 

@@ -23,12 +23,14 @@ A clear and concise description of what you expected to happen.
 **Screenshots**
 If applicable, add screenshots to help explain your problem.
 
-**Hardware (please complete the following information):**
+**Hardware / окружение (пожалуйста, заполните):**
 
-- Device: [e.g. iPhone6]
-- OS: [e.g. iOS]
-- Browser [e.g. chrome, safari]
-- Version [e.g. 22]
+- Модель Pi: [напр. Zero W / Zero W2 / RPi 5]
+- Версия Bjorn: [напр. v1.3.4 — `cat version.txt` или `curl -u admin:bjorn http://[ip]:8000/version`]
+- `epd_type`: [напр. epd2in13_V4]
+- Образ RPi OS: [напр. 2026-04-13-raspios-bookworm-arm64-lite]
+- Версия ядра: [вывод `uname -r`]
 
 **Additional context**
-Add any other context about the problem here.
+Добавьте любой дополнительный контекст. Перед отправкой проверьте
+[Руководство по устранению неполадок](../TROUBLESHOOTING.md).

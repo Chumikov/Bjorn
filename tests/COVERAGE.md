@@ -5,6 +5,11 @@
 Current gate: `--cov-fail-under=25` (in `pytest.ini`).
 Aspirational target: 50% overall, 70% new code.
 
+## Текущее состояние (v1.3.4)
+
+- Total coverage: **~27.8%**
+- Tests: **280 passing**
+
 ## Baseline (start of v1.3.0, after Stage -1 infrastructure setup)
 
 - Total coverage: **17.77%**
@@ -15,13 +20,15 @@ Aspirational target: 50% overall, 70% new code.
 
 ## Strategy
 
-v1.3.0 work adds ~30-40 regression tests focused on the bug fixes. Each task
-has at least one new test (see `Develop_Plan.md` Phase 0–11). Expected end-state
-of v1.3.0: ~35–40% overall coverage.
+v1.3.0 добавила ~30-40 регрессионных тестов под баг-фиксы (по тесту на каждую
+задачу, см. `Develop_Plan.md` Phase 0–11). Фактический результат v1.3.0–v1.3.4 —
+покрытие выросло с 17.77% до ~27.8% (а не до изначально ожидавшихся 35–40%:
+часть модулей вроде `display.py`, `orchestrator.py` остаются без поведенческих
+тестов, только source-level AST-проверки).
 
-The 50% target requires backfilling tests for currently-untouched modules
-(`Bjorn.py`, `orchestrator.py`, `display.py`, `comment.py`). That is scheduled
-for v1.4.0 (see PORT-* and MIGR-* phases).
+Цель 50% требует backfill-а поведенческих тестов для нетронутых модулей
+(`Bjorn.py`, `orchestrator.py`, `display.py`, `comment.py`). Запланировано на
+v1.4.0 (фазы PORT-* / MIGR-*).
 
 ## Running tests
 
