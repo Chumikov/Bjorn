@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bjorn — Login</title>
+    <link rel="icon" href="images/favicon.ico" type="image/x-icon">
+    <style>
+        body { margin:0; padding:0; height:100vh; display:flex; align-items:center;
+               justify-content:center; background-color:#333; font-family:Arial,sans-serif; }
+        .card { background:#444; padding:32px 28px; border-radius:14px; width:300px;
+                box-shadow:0 6px 24px rgba(0,0,0,.45); }
+        .card h1 { color:#fff; text-align:center; margin:0 0 6px; font-size:22px; }
+        .card p.sub { color:#999; text-align:center; margin:0 0 22px; font-size:12px; }
+        label { display:block; color:#ddd; font-size:13px; margin:12px 0 4px; }
+        input[type=text], input[type=password] { width:100%; box-sizing:border-box;
+            padding:10px; border-radius:8px; border:1px solid #666; background:#333;
+            color:#fff; font-size:14px; }
+        input:focus { outline:none; border-color:#e99f00; }
+        button { width:100%; margin-top:20px; padding:11px; border:none; border-radius:8px;
+            background:#e99f00; color:#000; font-size:15px; font-weight:bold; cursor:pointer; }
+        button:hover { background:#ffb627; }
+        .err { color:#ff6b6b; text-align:center; margin-top:14px; font-size:13px;
+               min-height:18px; }
+        .hint { color:#777; text-align:center; margin-top:18px; font-size:11px; }
+    </style>
+</head>
+<body>
+    <form class="card" id="loginForm" autocomplete="on">
+        <h1>BJORN</h1>
+        <p class="sub">Cyberviking — web console</p>
+        <label for="username">Логин</label>
+        <input type="text" id="username" name="username" autocomplete="username" required autofocus>
+        <label for="password">Пароль</label>
+        <input type="password" id="password" name="password" autocomplete="current-password" required>
+        <button type="submit">Войти</button>
+        <div class="err" id="err"></div>
+        <div class="hint">По умолчанию: admin / bjorn (смените в Config)</div>
+    </form>
+    <script>
+        document.getElementById('loginForm').addEventListener('submit', function (e) {
+            e.preventDefault();
+            var err = document.getElementById('err');
+            err.textContent = '';
+            var username = document.getElementById('username').value;
+            var password = document.getElementById('password').value;
+            fetch('/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username: username, password: password })
+            }).then(function (r) {
+                if (r.ok) {
+                    window.location.href = '/';
+                } else {
+                    err.textContent = 'Неверный логин или пароль';
+                }
+            }).catch(function () {
+                err.textContent = 'Ошибка сети';
+            });
+        });
+    </script>
+</body>
+</html>

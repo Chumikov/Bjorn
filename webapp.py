@@ -1,6 +1,9 @@
 #webapp.py
 import base64
+import hashlib
+import hmac
 import json
+import secrets
 import threading
 import http.server
 import socketserver
@@ -10,6 +13,7 @@ import signal
 import os
 import gzip
 import io
+from urllib.parse import parse_qs
 from logger import Logger
 from init_shared import shared_data
 from utils import WebUtils
@@ -60,6 +64,110 @@ def _web_auth_config(shared):
         "password": password,
         "bind_address": bind_address,
     }
+
+
+# PORT-8: session-based auth infrastructure. Replaces the browser Basic-auth
+# dialog with a login page + HMAC-signed session cookies. Passwords are stored
+# salted+hashed (PBKDF2-SHA256); the plaintext web_password is migrated once
+# on first auth. Basic Auth is still accepted (backward compat for curl/API).
+_SESSION_SECRET = secrets.token_bytes(32)
+_active_sessions = set()
+_session_lock = threading.Lock()
+_SESSION_COOKIE = "bjorn_session"
+_PBKDF2_ITERATIONS = 100_000
+
+
+def _hash_password(password, salt=None):
+    """Return (hash_hex, salt_hex). New salt generated when ``salt`` is None."""
+    if salt is None:
+        salt = secrets.token_bytes(16)
+    elif isinstance(salt, str):
+        salt = bytes.fromhex(salt)
+    dk = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt,
+                             _PBKDF2_ITERATIONS)
+    return dk.hex(), salt.hex()
+
+
+def _verify_password(password, stored_hash, stored_salt):
+    """Constant-time PBKDF2 verification of a candidate password."""
+    if not stored_hash or not stored_salt:
+        return False
+    try:
+        candidate, _ = _hash_password(password, stored_salt)
+    except (ValueError, TypeError):
+        return False
+    return hmac.compare_digest(candidate, stored_hash)
+
+
+def _make_session_token():
+    nonce = secrets.token_hex(16)
+    sig = hmac.new(_SESSION_SECRET, nonce.encode(), hashlib.sha256).hexdigest()
+    return f"{nonce}:{sig}"
+
+
+def _validate_session_token(token):
+    if not token or ":" not in token:
+        return False
+    nonce, _, sig = token.partition(":")
+    expected = hmac.new(_SESSION_SECRET, nonce.encode(), hashlib.sha256).hexdigest()
+    if not hmac.compare_digest(sig, expected):
+        return False
+    with _session_lock:
+        return token in _active_sessions
+
+
+def _revoke_session_token(token):
+    with _session_lock:
+        _active_sessions.discard(token)
+
+
+def _parse_session_cookie(cookie_header, name=_SESSION_COOKIE):
+    if not cookie_header:
+        return None
+    for part in cookie_header.split(";"):
+        part = part.strip()
+        if part.startswith(name + "="):
+            return part[len(name) + 1:]
+    return None
+
+
+def _ensure_password_hashed(shared, cfg):
+    """Migrate plaintext web_password → web_password_hash+salt (once, idempotent).
+
+    Persists the hash into shared.config and saves it. Updates ``cfg`` with
+    password_hash/password_salt so callers verify against the hash.
+    """
+    config = getattr(shared, "config", None)
+    if not isinstance(config, dict):
+        return cfg
+    stored_hash = config.get("web_password_hash")
+    stored_salt = config.get("web_password_salt")
+    if stored_hash and stored_salt:
+        cfg["password_hash"] = stored_hash
+        cfg["password_salt"] = stored_salt
+        return cfg
+    plaintext = cfg.get("password") or config.get("web_password")
+    if not plaintext:
+        return cfg
+    new_hash, new_salt = _hash_password(plaintext)
+    config["web_password_hash"] = new_hash
+    config["web_password_salt"] = new_salt
+    config.pop("web_password", None)  # don't keep plaintext once hashed
+    try:
+        if hasattr(shared, "save_config"):
+            shared.save_config()
+    except Exception as e:
+        logger.error(f"Could not persist hashed password: {e}")
+    cfg["password_hash"] = new_hash
+    cfg["password_salt"] = new_salt
+    cfg["password"] = ""
+    return cfg
+
+
+def _reset_session_state():
+    """Test helper: clear in-process session state between tests."""
+    with _session_lock:
+        _active_sessions.clear()
 
 class CustomHandler(http.server.SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
@@ -113,35 +221,125 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
                          "default-src 'self' 'unsafe-inline'; img-src 'self' data:;")
 
     def _check_auth(self):
-        """HTTP Basic Auth gate (WEB-8).
+        """Auth gate (PORT-8): session cookie OR Basic; else redirect to /login.
 
         Returns True if the request is authorised (or auth is disabled).
-        Sends a 401 response and returns False otherwise. Must be called
-        at the very top of do_GET/do_POST, before any other work.
+        - Valid ``bjorn_session`` cookie → pass.
+        - Basic Authorization header (backward compat for curl/API) → verify
+          against the salted hash; if present but wrong → 401.
+        - Otherwise → 302 redirect to /login (browser UX). The /login route
+          itself is served before this gate in do_GET, so no redirect loop.
         """
         cfg = _web_auth_config(self.shared_data)
         if not cfg["auth_enabled"]:
             return True
+        cfg = _ensure_password_hashed(self.shared_data, cfg)
+        # 1. Session cookie.
+        token = _parse_session_cookie(self.headers.get("Cookie", ""))
+        if token and _validate_session_token(token):
+            return True
+        # 2. Basic header (API/curl backward compat).
         header = self.headers.get("Authorization", "")
         if header.startswith("Basic "):
             try:
                 decoded = base64.b64decode(header[6:]).decode("utf-8", errors="replace")
                 user, _, pw = decoded.partition(":")
-                if user == cfg["username"] and pw == cfg["password"]:
+                if user == cfg["username"] and self._verify_creds(pw, cfg):
                     return True
             except Exception:
                 pass
-        # Not authorised — send 401 with WWW-Authenticate so the browser
-        # shows its built-in Basic auth dialog.
+            # Basic present but invalid — give API clients a clear 401.
+            self._send_unauthorized("Invalid credentials.")
+            return False
+        # 3. No creds — redirect browser to the login page.
+        self.send_response(302)
+        self.send_header("Location", "/login")
+        self.send_header("Content-type", "text/plain; charset=utf-8")
+        self.end_headers()
+        return False
+
+    def _verify_creds(self, password, cfg):
+        """Verify a candidate password against hash (preferred) or legacy plaintext."""
+        if cfg.get("password_hash") and cfg.get("password_salt"):
+            return _verify_password(password, cfg["password_hash"], cfg["password_salt"])
+        return password == cfg.get("password")
+
+    def _send_unauthorized(self, message="Authentication required."):
+        """Send a 401 without WWW-Authenticate (no browser Basic dialog)."""
         self.send_response(401)
-        self.send_header("WWW-Authenticate", 'Basic realm="Bjorn"')
         self.send_header("Content-type", "text/plain; charset=utf-8")
         self.end_headers()
         try:
-            self.wfile.write(b"Authentication required.\n")
+            self.wfile.write(message.encode("utf-8"))
         except Exception:
             pass
-        return False
+
+    # ---------------------------------------------------------- PORT-8 login
+
+    def _serve_login_page(self):
+        """Serve the standalone login page (no auth required)."""
+        login_path = os.path.join(self.shared_data.webdir, 'login.html')
+        if os.path.isfile(login_path):
+            self.serve_file_gzipped(login_path, 'text/html')
+        else:
+            self.send_response(200)
+            self.send_header("Content-type", "text/html; charset=utf-8")
+            self.end_headers()
+            self.wfile.write(
+                b"<form method='post' action='/login'>"
+                b"<input name='username'><input name='password' type='password'>"
+                b"<button>Login</button></form>")
+
+    def _read_post_creds(self):
+        """Parse JSON or form-encoded {username, password} from the request body."""
+        try:
+            length = int(self.headers.get("Content-Length", 0) or 0)
+        except ValueError:
+            length = 0
+        body = self.rfile.read(length) if length else b""
+        ctype = self.headers.get("Content-Type", "")
+        if "application/json" in ctype:
+            try:
+                return json.loads(body.decode("utf-8"))
+            except (ValueError, UnicodeDecodeError):
+                return {}
+        parsed = parse_qs(body.decode("utf-8", errors="replace"))
+        return {k: v[0] for k, v in parsed.items()}
+
+    def _handle_login_post(self):
+        """Verify credentials and issue a session cookie."""
+        creds = self._read_post_creds()
+        cfg = _web_auth_config(self.shared_data)
+        cfg = _ensure_password_hashed(self.shared_data, cfg)
+        username = creds.get("username", "")
+        password = creds.get("password", "")
+        if (not cfg["auth_enabled"]) or (
+                username == cfg["username"] and self._verify_creds(password, cfg)):
+            token = _make_session_token()
+            with _session_lock:
+                _active_sessions.add(token)
+            self.send_response(200)
+            self.send_header("Content-type", "application/json")
+            self.send_header("Set-Cookie",
+                             f"{_SESSION_COOKIE}={token}; HttpOnly; "
+                             f"SameSite=Strict; Path=/")
+            self.end_headers()
+            self.wfile.write(json.dumps({"status": "success"}).encode("utf-8"))
+        else:
+            self._send_unauthorized("Invalid credentials.")
+
+    def _handle_logout(self):
+        """Revoke the session cookie."""
+        token = _parse_session_cookie(self.headers.get("Cookie", ""))
+        if token:
+            _revoke_session_token(token)
+        self.send_response(200)
+        self.send_header("Content-type", "application/json")
+        self.send_header("Set-Cookie",
+                         f"{_SESSION_COOKIE}=; HttpOnly; SameSite=Strict; "
+                         f"Path=/; Max-Age=0")
+        self.end_headers()
+        self.wfile.write(json.dumps({"status": "success"}).encode("utf-8"))
 
     def send_gzipped_response(self, content, content_type):
         """Send a gzipped HTTP response."""
@@ -160,6 +358,10 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         self.send_gzipped_response(content, content_type)
 
     def do_GET(self):
+        # PORT-8: the login page is served without auth (it IS the auth).
+        if self.path == '/login':
+            self._serve_login_page()
+            return
         # Auth gate (WEB-8). Applies to every GET including static assets.
         if not self._check_auth():
             return
@@ -228,6 +430,14 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             super().do_GET()
 
     def do_POST(self):
+        # PORT-8: login/logout bypass the auth+CSRF gates (no session before
+        # login; logout just clears the cookie).
+        if self.path == '/login':
+            self._handle_login_post()
+            return
+        if self.path == '/logout':
+            self._handle_logout()
+            return
         # Auth gate (WEB-8). Must precede CSRF check — unauthorised callers
         # should not even learn whether a CSRF token exists.
         if not self._check_auth():

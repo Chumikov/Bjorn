@@ -145,6 +145,10 @@ class SharedData:
             "web_username": "admin",
             "web_password": "bjorn",
             "web_bind_address": "0.0.0.0",
+            # PORT-8: salted PBKDF2 hash of web_password (migrated on first
+            # auth). Empty until migrated; web_password stays until then.
+            "web_password_hash": "",
+            "web_password_salt": "",
 
             "startup_delay": 10,
             "web_delay": 2,

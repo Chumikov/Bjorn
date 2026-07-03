@@ -6,6 +6,7 @@ cross-site attacks, not direct access. This adds Basic Auth on every
 endpoint (do_GET + do_POST gate) plus a configurable bind address.
 """
 import base64
+import json
 import sys
 import urllib.error
 import urllib.request
@@ -55,7 +56,9 @@ class TestBasicAuthGate:
         assert hasattr(webapp.CustomHandler, "_check_auth"), (
             "CustomHandler must define _check_auth().")
 
-    def test_unauthenticated_returns_401(self, mock_handler, mock_shared_data):
+    def test_unauthenticated_redirects_to_login(self, mock_handler, mock_shared_data):
+        """PORT-8: no session + no Basic → 302 redirect to /login (not 401
+        with a browser Basic dialog)."""
         sys.modules.pop('webapp', None)
         import webapp
         _set_config(mock_shared_data, web_auth_enabled=True,
@@ -66,9 +69,11 @@ class TestBasicAuthGate:
         result = h._check_auth()
         assert result is False, "Unauthenticated request must return False"
         codes = [s[1] for s in h._sent if s[0] == "response"]
-        assert 401 in codes, f"Expected 401; got {codes}"
+        assert 302 in codes, f"Expected 302 redirect to /login; got {codes}"
 
-    def test_www_authenticate_header_present(self, mock_shared_data):
+    def test_no_credentials_redirect_location(self, mock_shared_data):
+        """The redirect must point at /login, and no WWW-Authenticate header
+        is sent (PORT-8 removed the browser Basic dialog)."""
         sys.modules.pop('webapp', None)
         import webapp
         _set_config(mock_shared_data, web_auth_enabled=True,
@@ -78,10 +83,11 @@ class TestBasicAuthGate:
         h.web_utils = MagicMock()
         h._check_auth()
         headers = {s[1]: s[2] for s in h._sent if s[0] == "header"}
-        assert "WWW-Authenticate" in headers, (
-            f"401 response must include WWW-Authenticate for browser prompt; "
-            f"got {headers}")
-        assert "Basic" in headers["WWW-Authenticate"]
+        assert headers.get("Location") == "/login", (
+            f"Redirect must target /login; got {headers}")
+        assert "WWW-Authenticate" not in headers, (
+            "PORT-8: WWW-Authenticate (browser Basic dialog) must be gone.")
+
 
     def test_wrong_password_returns_401(self, mock_shared_data):
         sys.modules.pop('webapp', None)
@@ -287,17 +293,19 @@ class TestAuthGateBehavioral:
         creds = base64.b64encode(f"{user}:{pw}".encode()).decode()
         return {"Authorization": f"Basic {creds}"}
 
-    def test_get_without_credentials_returns_401(self, custom_handler_server):
-        """do_GET with auth on + no creds -> 401, file NOT served."""
+    def test_get_without_credentials_redirects_to_login(self, custom_handler_server):
+        """PORT-8: do_GET with auth on + no creds -> 302 redirect to /login."""
         self._enable_auth(custom_handler_server["shared"])
         url = f"{custom_handler_server['base_url']}/css/styles.css"
+        opener = self._no_redirect_opener()
         with pytest.raises(urllib.error.HTTPError) as exc:
-            urllib.request.urlopen(url, timeout=5)
-        assert exc.value.code == 401, (
-            f"Unauthenticated GET must be gated with 401; got {exc.value.code}")
+            opener.open(url, timeout=5)
+        assert exc.value.code == 302, (
+            f"Unauthenticated GET must redirect to /login; got {exc.value.code}")
+        assert exc.value.headers.get("Location") == "/login"
 
     def test_get_with_wrong_password_returns_401(self, custom_handler_server):
-        """do_GET with auth on + wrong password -> 401."""
+        """do_GET with auth on + wrong Basic password -> 401 (clear API error)."""
         self._enable_auth(custom_handler_server["shared"])
         url = f"{custom_handler_server['base_url']}/css/styles.css"
         req = urllib.request.Request(url, headers=self._basic("admin", "wrong"))
@@ -305,30 +313,94 @@ class TestAuthGateBehavioral:
             urllib.request.urlopen(req, timeout=5)
         assert exc.value.code == 401
 
-    def test_get_with_correct_credentials_returns_200(self, custom_handler_server):
-        """do_GET with auth on + correct creds -> 200 (gate passes, file served)."""
+    def test_get_with_correct_basic_credentials_returns_200(self, custom_handler_server):
+        """Basic Auth (backward compat) still works against the salted hash."""
         self._enable_auth(custom_handler_server["shared"])
         url = f"{custom_handler_server['base_url']}/css/styles.css"
         req = urllib.request.Request(url, headers=self._basic("admin", "secret"))
         with urllib.request.urlopen(req, timeout=5) as resp:
             assert resp.status == 200, (
-                f"Correct creds must reach the file; got {resp.status}")
+                f"Correct Basic creds must reach the file; got {resp.status}")
             assert b"background-color" in resp.read(), (
                 "Correct creds must actually serve styles.css, not just pass the gate")
 
-    def test_post_without_credentials_blocked_before_csrf(self, custom_handler_server):
-        """do_POST with auth on + no creds -> 401 BEFORE the CSRF check.
+    def test_post_without_credentials_redirects_before_csrf(self, custom_handler_server):
+        """do_POST with auth on + no creds -> 302 to /login BEFORE the CSRF check.
 
-        This pins the ordering invariant: an unauthenticated caller must not
-        even learn whether a CSRF token exists. If _check_auth were moved
-        below the CSRF check, a no-cred POST would get 403 instead of 401.
-        """
+        Pins the ordering invariant: an unauthenticated caller must not learn
+        whether a CSRF token exists (must NOT get 403)."""
         self._enable_auth(custom_handler_server["shared"])
         url = f"{custom_handler_server['base_url']}/save_config"
         req = urllib.request.Request(url, data=b"{}", method="POST")
+        opener = self._no_redirect_opener()
+        with pytest.raises(urllib.error.HTTPError) as exc:
+            opener.open(req, timeout=5)
+        assert exc.value.code == 302, (
+            f"Unauthenticated POST must redirect (302), not reach CSRF (403); "
+            f"got {exc.value.code}")
+
+    # -------------------------------------------------- PORT-8 session flow
+
+    def test_login_issues_cookie_and_session_grants_access(self, custom_handler_server):
+        """POST /login with correct creds -> Set-Cookie; that cookie then
+        authenticates a subsequent GET (no Basic needed)."""
+        self._enable_auth(custom_handler_server["shared"])
+        base = custom_handler_server["base_url"]
+        login_req = urllib.request.Request(
+            f"{base}/login", method="POST",
+            data=json.dumps({"username": "admin", "password": "secret"}).encode(),
+            headers={"Content-Type": "application/json"})
+        with urllib.request.urlopen(login_req, timeout=5) as resp:
+            assert resp.status == 200
+            cookie = resp.headers.get("Set-Cookie", "")
+        assert "bjorn_session=" in cookie, f"Login must set session cookie; got {cookie!r}"
+        token = cookie.split("bjorn_session=")[1].split(";")[0]
+
+        # The session cookie must grant access without Basic creds.
+        req = urllib.request.Request(f"{base}/css/styles.css",
+                                     headers={"Cookie": f"bjorn_session={token}"})
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            assert resp.status == 200
+            assert b"background-color" in resp.read()
+
+    def test_login_wrong_password_returns_401(self, custom_handler_server):
+        self._enable_auth(custom_handler_server["shared"])
+        base = custom_handler_server["base_url"]
+        req = urllib.request.Request(
+            f"{base}/login", method="POST",
+            data=json.dumps({"username": "admin", "password": "nope"}).encode(),
+            headers={"Content-Type": "application/json"})
         with pytest.raises(urllib.error.HTTPError) as exc:
             urllib.request.urlopen(req, timeout=5)
-        assert exc.value.code == 401, (
-            f"Unauthenticated POST must be 401 (auth gate before CSRF); "
-            f"got {exc.value.code}. If this is 403, the auth gate is running "
-            f"after the CSRF check.")
+        assert exc.value.code == 401
+
+    def test_logout_invalidates_session(self, custom_handler_server):
+        """After POST /logout, the session cookie no longer grants access."""
+        self._enable_auth(custom_handler_server["shared"])
+        base = custom_handler_server["base_url"]
+        login_req = urllib.request.Request(
+            f"{base}/login", method="POST",
+            data=json.dumps({"username": "admin", "password": "secret"}).encode(),
+            headers={"Content-Type": "application/json"})
+        with urllib.request.urlopen(login_req, timeout=5) as resp:
+            token = resp.headers.get("Set-Cookie", "").split("bjorn_session=")[1].split(";")[0]
+
+        logout_req = urllib.request.Request(
+            f"{base}/logout", method="POST",
+            headers={"Cookie": f"bjorn_session={token}"})
+        urllib.request.urlopen(logout_req, timeout=5)  # 200
+
+        # Revoked cookie -> redirect to /login (no longer authenticated).
+        opener = self._no_redirect_opener()
+        with pytest.raises(urllib.error.HTTPError) as exc:
+            opener.open(urllib.request.Request(
+                f"{base}/version", headers={"Cookie": f"bjorn_session={token}"}),
+                timeout=5)
+        assert exc.value.code == 302, "Logged-out session must no longer grant access."
+
+    @staticmethod
+    def _no_redirect_opener():
+        class _NoRedirect(urllib.request.HTTPRedirectHandler):
+            def redirect_request(self, req, fp, code, msg, headers, newurl):
+                return None
+        return urllib.request.build_opener(_NoRedirect)
