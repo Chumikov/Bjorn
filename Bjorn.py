@@ -20,12 +20,15 @@ import signal
 import logging
 import time
 import sys
+import os
 import subprocess
+import atexit
 from init_shared import shared_data
 from display import Display, handle_exit_display
 from comment import Commentaireia
 from webapp import web_thread, handle_exit_web
 from orchestrator import Orchestrator
+from instance_lock import acquire_instance_lock, release_instance_lock
 from logger import Logger
 
 logger = Logger(name="Bjorn.py", level=logging.DEBUG)
@@ -148,6 +151,11 @@ def handle_exit(sig, frame, display_thread, bjorn_thread, web_thread):
 if __name__ == "__main__":
     logger.info("Starting threads")
 
+    # PORT-1: refuse to start if another Bjorn is already running.
+    if not acquire_instance_lock():
+        sys.exit(1)
+    atexit.register(release_instance_lock)
+
     try:
         logger.info("Loading shared data config...")
         shared_data.load_config()
@@ -194,6 +202,7 @@ if __name__ == "__main__":
             web_thread.shutdown()
             web_thread.join(timeout=10)
         logger.info("Main loop finished. Clean exit.")
+        release_instance_lock()
 
     except Exception as e:
         logger.error(f"An exception occurred during thread start: {e}")
