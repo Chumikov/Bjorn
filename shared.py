@@ -174,6 +174,9 @@ class SharedData:
             "nmap_scan_aggressivity": "-T2",
             "portstart": 1,
             "portend": 2,
+            # PORT-12: список CIDR для сканирования. Пусто = авто-детект
+            # одной подсети (поведение до v1.4.0).
+            "custom_subnets": [],
             
             "__title_timewaits__": "Time Wait Settings",
             "timewait_smb": 0,

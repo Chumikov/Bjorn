@@ -538,54 +538,81 @@ class NetworkScanner:
             except Exception as e:
                 self.logger.error(f"Error in clean_scan_results: {e}")
 
+    def _build_networks(self):
+        """PORT-12: build the list of IPv4Networks to scan.
+
+        Custom subnets (``config['custom_subnets']``) take precedence when
+        non-empty; empty or all-invalid falls back to auto-detection via
+        ``get_network()`` (поведение до v1.4.0).
+        """
+        custom = list(self.shared_data.custom_subnets or [])
+        if custom:
+            networks = []
+            for entry in custom:
+                try:
+                    networks.append(ipaddress.IPv4Network(str(entry), strict=False))
+                except ValueError as e:
+                    self.logger.error(f"Invalid custom subnet {entry!r}: {e}")
+            if networks:
+                return networks
+            self.logger.warning(
+                "custom_subnets set but none valid; falling back to auto-detect")
+        return [self.get_network()]
+
     def scan(self):
         """
         Initiates the network scan, updates the netkb file, and displays the results.
+
+        PORT-12: если config['custom_subnets'] непустой — сканирует каждый
+        указанный CIDR; иначе авто-детект одной подсети (поведение до v1.4.0).
         """
         try:
             self.shared_data.bjornorch_status = "NetworkScanner"
             self.logger.info(f"Starting Network Scanner")
-            network = self.get_network()
-            self.shared_data.bjornstatustext2 = str(network)
+            # PORT-12: построение списка подсетей для сканирования.
+            networks = self._build_networks()
+            self.shared_data.bjornstatustext2 = ", ".join(str(n) for n in networks)
+
             portstart = self.shared_data.portstart
             portend = self.shared_data.portend
             extra_ports = self.shared_data.portlist
-            scanner = self.ScanPorts(self, network, portstart, portend, extra_ports)
-            ip_data, open_ports, all_ports, csv_result_file, netkbfile, alive_ips = scanner.start()
-
-            alive_macs = set(ip_data.mac_list)
-
-            table = Table(title="Scan Results", show_lines=True)
-            table.add_column("IP", style="cyan", no_wrap=True)
-            table.add_column("Hostname", style="cyan", no_wrap=True)
-            table.add_column("Alive", style="cyan", no_wrap=True)
-            table.add_column("MAC Address", style="cyan", no_wrap=True)
-            for port in all_ports:
-                table.add_column(f"{port}", style="green")
 
             netkb_data = []
-            for ip, ports, hostname, mac in zip(ip_data.ip_list, open_ports.values(), ip_data.hostname_list, ip_data.mac_list):
-                if self.blacklistcheck and (mac in self.mac_scan_blacklist or ip in self.ip_scan_blacklist):
-                    continue
-                alive = '1' if mac in alive_macs else '0'
-                row = [ip, hostname, alive, mac] + [Text(str(port), style="green bold") if port in ports else Text("", style="on red") for port in all_ports]
-                table.add_row(*row)
-                netkb_data.append([mac, ip, hostname, ports])
+            alive_macs = set()
+            netkbfile = self.shared_data.netkbfile
 
-            with self.lock:
-                with open(csv_result_file, 'w', newline='') as file:
-                    writer = csv.writer(file)
-                    writer.writerow(["IP", "Hostname", "Alive", "MAC Address"] + [str(port) for port in all_ports])
-                    for ip, ports, hostname, mac in zip(ip_data.ip_list, open_ports.values(), ip_data.hostname_list, ip_data.mac_list):
-                        if self.blacklistcheck and (mac in self.mac_scan_blacklist or ip in self.ip_scan_blacklist):
-                            continue
-                        alive = '1' if mac in alive_macs else '0'
-                        writer.writerow([ip, hostname, alive, mac] + [str(port) if port in ports else '' for port in all_ports])
+            for network in networks:
+                self.logger.info(f"Scanning subnet {network}")
+                scanner = self.ScanPorts(self, network, portstart, portend, extra_ports)
+                ip_data, open_ports, all_ports, csv_result_file, netkbfile, alive_ips = scanner.start()
+
+                alive_macs.update(ip_data.mac_list)
+
+                table = Table(title=f"Scan Results — {network}", show_lines=True)
+                table.add_column("IP", style="cyan", no_wrap=True)
+                table.add_column("Hostname", style="cyan", no_wrap=True)
+                table.add_column("Alive", style="cyan", no_wrap=True)
+                table.add_column("MAC Address", style="cyan", no_wrap=True)
+                for port in all_ports:
+                    table.add_column(f"{port}", style="green")
+
+                with self.lock:
+                    with open(csv_result_file, 'w', newline='') as file:
+                        writer = csv.writer(file)
+                        writer.writerow(["IP", "Hostname", "Alive", "MAC Address"] + [str(port) for port in all_ports])
+                        for ip, ports, hostname, mac in zip(ip_data.ip_list, open_ports.values(), ip_data.hostname_list, ip_data.mac_list):
+                            if self.blacklistcheck and (mac in self.mac_scan_blacklist or ip in self.ip_scan_blacklist):
+                                continue
+                            alive = '1' if mac in alive_macs else '0'
+                            row = [ip, hostname, alive, mac] + [Text(str(port), style="green bold") if port in ports else Text("", style="on red") for port in all_ports]
+                            table.add_row(*row)
+                            writer.writerow([ip, hostname, alive, mac] + [str(port) if port in ports else '' for port in all_ports])
+                            netkb_data.append([mac, ip, hostname, ports])
+
+                if self.displaying_csv:
+                    self.display_csv(csv_result_file)
 
             self.update_netkb(netkbfile, netkb_data, alive_macs)
-
-            if self.displaying_csv:
-                self.display_csv(csv_result_file)
 
             source_csv_path = self.shared_data.netkbfile
             output_csv_path = self.shared_data.livestatusfile
