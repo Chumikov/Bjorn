@@ -54,7 +54,10 @@ class Display:
 
         try:
             self.epd_helper = self.shared_data.epd_helper
-            self.epd_helper.init_partial_update()
+            # PORT-11: in headless mode epd_helper is None — skip hardware
+            # init, the render→screen.png path still feeds the web UI.
+            if self.epd_helper:
+                self.epd_helper.init_partial_update()
             logger.info("Display initialization complete.")
         except Exception as e:
             logger.error(f"Error during display initialization: {e}")
@@ -284,7 +287,9 @@ class Display:
         self.manual_mode_txt = ""
         while not self.shared_data.display_should_exit:
             try:
-                self.epd_helper.init_partial_update()
+                # PORT-11: hardware push only when an EPD is present.
+                if self.epd_helper:
+                    self.epd_helper.init_partial_update()
                 self.display_comment(self.shared_data.bjornorch_status)
                 image = Image.new('1', (self.shared_data.width, self.shared_data.height))
                 draw = ImageDraw.Draw(image)
@@ -350,8 +355,12 @@ class Display:
                     # on Pillow 12+.
                     image = image.transpose(Image.Transpose.ROTATE_180)
 
-                self.epd_helper.display_partial(image)
-                self.epd_helper.display_partial(image)
+                # PORT-11: push to hardware only when an EPD is attached.
+                # The screen.png write below always runs so the web UI keeps
+                # updating in headless mode.
+                if self.epd_helper:
+                    self.epd_helper.display_partial(image)
+                    self.epd_helper.display_partial(image)
 
                 if self.web_screen_reversed:
                     image = image.transpose(Image.Transpose.ROTATE_180)
@@ -380,7 +389,8 @@ def handle_exit_display(signum, frame, display_thread):
     shared_data.display_should_exit = True
     logger.info("Exit signal received. Waiting for the main loop to finish...")
     try:
-        if main_loop and main_loop.epd:
+        # PORT-11: in headless mode main_loop has no epd hardware handle.
+        if main_loop and getattr(main_loop, "epd", None):
             main_loop.epd.init(main_loop.epd.sleep)
             main_loop.epd.Dev_exit()
     except Exception as e:

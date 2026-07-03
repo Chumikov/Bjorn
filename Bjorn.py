@@ -153,9 +153,15 @@ if __name__ == "__main__":
         shared_data.load_config()
         logger.info(f"Bjorn v{shared_data.version}")
 
-        logger.info("Starting display thread...")
+        # PORT-11: skip the display thread entirely in headless mode
+        # (epd_type='none'). The web UI becomes the primary interface.
         shared_data.display_should_exit = False  # Initialize display should_exit
-        display_thread = Bjorn.start_display()
+        if shared_data.config.get("epd_type") == "none":
+            logger.info("Headless mode: display thread not started.")
+            display_thread = None
+        else:
+            logger.info("Starting display thread...")
+            display_thread = Bjorn.start_display()
 
         logger.info("Starting Bjorn thread...")
         bjorn = Bjorn(shared_data)
@@ -181,7 +187,8 @@ if __name__ == "__main__":
         logger.info("Bjorn main thread waiting for bjorn_thread to exit...")
         bjorn_thread.join()
         logger.info("bjorn_thread exited; cleaning up display and web threads...")
-        if display_thread.is_alive():
+        # PORT-11: display_thread is None in headless mode.
+        if display_thread and display_thread.is_alive():
             display_thread.join(timeout=10)
         if web_thread.is_alive():
             web_thread.shutdown()

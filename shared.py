@@ -261,7 +261,25 @@ class SharedData:
     #         logger.error(f"Error initializing EPD display: {e}")
     #         raise
     def initialize_epd_display(self):
-        """Initialize the e-paper display."""
+        """Initialize the e-paper display.
+
+        PORT-11 (headless mode): when ``epd_type == "none"`` the device runs
+        without an e-Paper HAT. EPD init is skipped, width/height fall back
+        to the reference dimensions so PIL rendering and the web UI
+        ``screen.png`` still work, ``screen_reversed`` is cleared, and
+        ``epd_helper`` stays None. ``Display.run()`` guards every hardware
+        call on ``epd_helper`` truthiness, so the render→screen.png path
+        keeps functioning as the primary interface.
+        """
+        if self.config.get("epd_type") == "none":
+            logger.info("Headless mode (epd_type='none'): EPD init skipped, "
+                        "web UI is the primary interface.")
+            self.epd_helper = None
+            self.screen_reversed = False
+            self.web_screen_reversed = False
+            self.width = self.ref_width
+            self.height = self.ref_height
+            return
         try:
             logger.info("Initializing EPD display...")
             time.sleep(1)
