@@ -7,6 +7,8 @@ endpoint (do_GET + do_POST gate) plus a configurable bind address.
 """
 import base64
 import sys
+import urllib.error
+import urllib.request
 from unittest.mock import MagicMock
 
 import pytest
@@ -257,3 +259,76 @@ class TestConfigDefaults:
         assert cfg["web_username"] == "admin"
         assert cfg["web_password"] == "bjorn"
         assert cfg["web_bind_address"] == "0.0.0.0"
+
+
+class TestAuthGateBehavioral:
+    """End-to-end auth-gate: drive the REAL do_GET/do_POST dispatch over a
+    real HTTP socket with auth ENABLED and assert the gate fires before any
+    file is served or any handler branch runs.
+
+    The source-level ordering tests (test_do_GET_calls_check_auth_first /
+    test_do_POST_calls_check_auth_first) only confirm that the string
+    ``_check_auth`` lexically precedes ``serve_file_gzipped``/``csrf_token``
+    in the source. They would still pass if the gate were reordered or
+    bypassed as long as the textual order looked right. These behavioral
+    tests issue actual requests and assert on the HTTP response, so a real
+    bypass (e.g. someone moving _check_auth below the file-serving branch,
+    or dropping the ``if not self._check_auth(): return`` guard) is caught.
+    """
+
+    @staticmethod
+    def _enable_auth(mock_shared, user="admin", pw="secret"):
+        cfg = dict(mock_shared.config)
+        cfg.update(web_auth_enabled=True, web_username=user, web_password=pw)
+        mock_shared.config = cfg
+
+    @staticmethod
+    def _basic(user, pw):
+        creds = base64.b64encode(f"{user}:{pw}".encode()).decode()
+        return {"Authorization": f"Basic {creds}"}
+
+    def test_get_without_credentials_returns_401(self, custom_handler_server):
+        """do_GET with auth on + no creds -> 401, file NOT served."""
+        self._enable_auth(custom_handler_server["shared"])
+        url = f"{custom_handler_server['base_url']}/css/styles.css"
+        with pytest.raises(urllib.error.HTTPError) as exc:
+            urllib.request.urlopen(url, timeout=5)
+        assert exc.value.code == 401, (
+            f"Unauthenticated GET must be gated with 401; got {exc.value.code}")
+
+    def test_get_with_wrong_password_returns_401(self, custom_handler_server):
+        """do_GET with auth on + wrong password -> 401."""
+        self._enable_auth(custom_handler_server["shared"])
+        url = f"{custom_handler_server['base_url']}/css/styles.css"
+        req = urllib.request.Request(url, headers=self._basic("admin", "wrong"))
+        with pytest.raises(urllib.error.HTTPError) as exc:
+            urllib.request.urlopen(req, timeout=5)
+        assert exc.value.code == 401
+
+    def test_get_with_correct_credentials_returns_200(self, custom_handler_server):
+        """do_GET with auth on + correct creds -> 200 (gate passes, file served)."""
+        self._enable_auth(custom_handler_server["shared"])
+        url = f"{custom_handler_server['base_url']}/css/styles.css"
+        req = urllib.request.Request(url, headers=self._basic("admin", "secret"))
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            assert resp.status == 200, (
+                f"Correct creds must reach the file; got {resp.status}")
+            assert b"background-color" in resp.read(), (
+                "Correct creds must actually serve styles.css, not just pass the gate")
+
+    def test_post_without_credentials_blocked_before_csrf(self, custom_handler_server):
+        """do_POST with auth on + no creds -> 401 BEFORE the CSRF check.
+
+        This pins the ordering invariant: an unauthenticated caller must not
+        even learn whether a CSRF token exists. If _check_auth were moved
+        below the CSRF check, a no-cred POST would get 403 instead of 401.
+        """
+        self._enable_auth(custom_handler_server["shared"])
+        url = f"{custom_handler_server['base_url']}/save_config"
+        req = urllib.request.Request(url, data=b"{}", method="POST")
+        with pytest.raises(urllib.error.HTTPError) as exc:
+            urllib.request.urlopen(req, timeout=5)
+        assert exc.value.code == 401, (
+            f"Unauthenticated POST must be 401 (auth gate before CSRF); "
+            f"got {exc.value.code}. If this is 403, the auth gate is running "
+            f"after the CSRF check.")

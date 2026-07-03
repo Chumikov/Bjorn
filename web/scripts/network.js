@@ -27,11 +27,11 @@ function toggleNetworkToolbar() {
 
     if (mainToolbar.classList.contains('hidden')) {
         mainToolbar.classList.remove('hidden');
-        toggleIcon.src = '/web/images/hide.png';
+        toggleIcon.src = '/images/hide.png';
         toggleButton.setAttribute('data-open', 'true');
     } else {
         mainToolbar.classList.add('hidden');
-        toggleIcon.src = '/web/images/reveal.png';
+        toggleIcon.src = '/images/reveal.png';
         toggleButton.setAttribute('data-open', 'false');
     }
 }

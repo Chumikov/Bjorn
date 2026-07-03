@@ -19,7 +19,7 @@ function generateFileListHTML(files, path, indent) {
     let html = '<ul>';
     files.forEach(file => {
         if (file.is_directory) {
-            const icon = path === "/" ? "web/images/mainfolder.png" : "web/images/subfolder.png";
+            const icon = path === "/" ? "images/mainfolder.png" : "images/subfolder.png";
             html += `
                 <li style="margin-left: ${indent * 5}px;">
                     <img src="${icon}" alt="Folder Icon" style="height: 20px;">
@@ -29,7 +29,7 @@ function generateFileListHTML(files, path, indent) {
                     </ul>
                 </li>`;
         } else {
-            const icon = "web/images/file.png";
+            const icon = "images/file.png";
             html += `
                 <li style="margin-left: ${indent * 5}px;">
                     <img src="${icon}" alt="File Icon" style="height: 20px;">
@@ -52,11 +52,11 @@ function toggleLootToolbar() {
     const toggleIcon = document.getElementById('toggle-icon');
     if (mainToolbar.classList.contains('hidden')) {
         mainToolbar.classList.remove('hidden');
-        toggleIcon.src = '/web/images/hide.png';
+        toggleIcon.src = '/images/hide.png';
         toggleButton.setAttribute('data-open', 'false');
     } else {
         mainToolbar.classList.add('hidden');
-        toggleIcon.src = '/web/images/reveal.png';
+        toggleIcon.src = '/images/reveal.png';
         toggleButton.setAttribute('data-open', 'true');
     }
 }

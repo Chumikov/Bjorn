@@ -163,6 +163,41 @@ def real_http_server(tmp_path):
 
 
 @pytest.fixture
+def custom_handler_server(mock_shared_data):
+    """Spin up a real HTTPServer using webapp.CustomHandler against the
+    REAL webdir (PROJECT_ROOT/web), so static assets (css/images/scripts)
+    actually exist on disk.
+
+    Auth is disabled by default (conftest config). Enable it per-test by
+    mutating the yielded 'shared' mock's .config before issuing requests.
+
+    Unlike real_http_server (which serves _SilentHTTPRequestHandler from a
+    tmp dir), this drives the production CustomHandler.do_GET/do_POST
+    dispatch end-to-end, including _check_auth and the directory= fallback.
+
+    Yields dict: host, port, base_url, shared (the mock_shared_data).
+    """
+    sys.modules.pop('webapp', None)
+    import webapp
+    webapp.shared_data = mock_shared_data
+    httpd = HTTPServer(("127.0.0.1", 0), webapp.CustomHandler)
+    thread = threading.Thread(target=httpd.serve_forever, daemon=True)
+    thread.start()
+    try:
+        port = httpd.server_address[1]
+        yield {
+            "host": "127.0.0.1",
+            "port": port,
+            "base_url": f"http://127.0.0.1:{port}",
+            "shared": mock_shared_data,
+        }
+    finally:
+        httpd.shutdown()
+        httpd.server_close()
+        thread.join(timeout=3)
+
+
+@pytest.fixture
 def real_ftp_server():
     """Minimal in-process FTP control-channel server (raw sockets).
 

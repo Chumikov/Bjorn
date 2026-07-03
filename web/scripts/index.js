@@ -94,10 +94,10 @@ function toggleConsole() {
     
     if (isConsoleOn) {
         stopConsole();
-        toggleImage.src = '/web/images/off.png';
+        toggleImage.src = '/images/off.png';
     } else {
         startConsole();
-        toggleImage.src = '/web/images/on.png';
+        toggleImage.src = '/images/on.png';
     }
     
     isConsoleOn = !isConsoleOn;
@@ -118,11 +118,11 @@ document.addEventListener('DOMContentLoaded', () => {
         const isOpen = toggleButton.getAttribute('data-open') === 'true';
         if (isOpen) {
             mainToolbar.classList.add('hidden');
-            toggleIcon.src = '/web/images/reveal.png';
+            toggleIcon.src = '/images/reveal.png';
             toggleButton.setAttribute('data-open', 'false');
         } else {
             mainToolbar.classList.remove('hidden');
-            toggleIcon.src = '/web/images/hide.png';
+            toggleIcon.src = '/images/hide.png';
             toggleButton.setAttribute('data-open', 'true');
         }
         toggleConsoleSize();
@@ -137,7 +137,7 @@ function loadDropdown() {
     const dropdownContent = `
         <div class="dropdown">
             <button type="button" class="toolbar-button" onclick="toggleDropdown()" data-open="false">
-                <img src="/web/images/manual_icon.png" alt="Icon_actions" style="height: 50px;">
+                <img src="/images/manual_icon.png" alt="Icon_actions" style="height: 50px;">
             </button>
             <div class="dropdown-content">
                 <button type="button" onclick="clear_files()">Clear Files</button>
@@ -161,7 +161,7 @@ function loadBjornDropdown() {
     const bjornDropdownContent = `
         <div class="dropdown bjorn-dropdown">
             <button type="button" class="toolbar-button" onclick="toggleBjornDropdown()" data-open="false">
-                <img src="/web/images/bjorn_icon.png" alt="Icon_bjorn" style="height: 50px;">
+                <img src="/images/bjorn_icon.png" alt="Icon_bjorn" style="height: 50px;">
             </button>
             <div class="dropdown-content">
                 <img id="screenImage_Home"  onclick="window.location.href='/bjorn.html'" src="screen.png" alt="Bjorn" style="width: 100%;">

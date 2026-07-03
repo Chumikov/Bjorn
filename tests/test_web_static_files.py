@@ -4,11 +4,24 @@ Without it, the fallback ``super().do_GET()`` (used for any static asset
 not matched by an explicit route) serves from ``os.getcwd()`` instead of
 the configured web directory. On a systemd-launched service cwd is ``/``,
 so all non-routed static assets would 404.
+
+History: the original tests here only inspected the *source* (AST /
+inspect.getsource) to confirm the ``directory=`` kwarg was present. That
+let a real regression through — the kwarg WAS passed, but the HTML
+referenced assets with a redundant ``web/`` prefix, so requests resolved
+to ``<webdir>/web/css/...`` (double-nested) and 404'd. The CSS, JS and
+all icons silently failed to load.
+
+The integration tests below (TestStaticAssetResolution) drive the real
+CustomHandler over a real HTTP socket against the production webdir and
+assert HTTP 200 + body content, so a path-resolution regression can no
+longer pass silently.
 """
 import http.server
 import inspect
-import os
 import sys
+import urllib.error
+import urllib.request
 from unittest.mock import MagicMock
 
 import pytest
@@ -131,3 +144,60 @@ class TestStaticFileDirectory:
                     "super().__init__() must pass directory= keyword. "
                     f"Found kwargs: {kwarg_names}")
         assert super_call_found, "Could not find super().__init__() call"
+
+
+class TestStaticAssetResolution:
+    """Integration: real HTTP GET for static assets must return 200.
+
+    These are the tests that the original WEB-2 suite lacked. They spin up
+    a real CustomHandler over a real socket against the production webdir
+    (PROJECT_ROOT/web) and assert that CSS / JS / image requests actually
+    resolve to a file and come back with HTTP 200 + non-empty body.
+
+    Regression guard for the v1.3.x bug where assets were referenced with a
+    redundant ``web/`` prefix while the server root was already ``webdir``,
+    causing every asset to 404.
+    """
+
+    def _get(self, server, path):
+        url = f"{server['base_url']}{path}"
+        with urllib.request.urlopen(url, timeout=5) as resp:
+            return resp.status, resp.read(), resp.headers.get("Content-type", "")
+
+    def test_static_css_returns_200(self, custom_handler_server):
+        """GET /css/styles.css -> 200, real CSS body (not 404)."""
+        status, body, _ = self._get(custom_handler_server, "/css/styles.css")
+        assert status == 200, f"CSS must load; got {status}"
+        assert b"background-color" in body, (
+            "styles.css body missing expected CSS rule; got:\n" + body.decode("utf-8", "replace"))
+
+    def test_static_image_returns_200(self, custom_handler_server):
+        """GET /images/console_icon.png -> 200 with an image Content-Type."""
+        status, body, ctype = self._get(custom_handler_server,
+                                        "/images/console_icon.png")
+        assert status == 200, f"icon must load; got {status}"
+        assert ctype.startswith("image/"), (
+            f"icon must be served as image/*; got Content-Type {ctype!r}")
+        assert len(body) > 0, "icon body must not be empty"
+
+    def test_static_js_returns_200(self, custom_handler_server):
+        """GET /scripts/csrf.js -> 200 (JS loaded by every page)."""
+        status, body, _ = self._get(custom_handler_server, "/scripts/csrf.js")
+        assert status == 200, f"csrf.js must load; got {status}"
+        assert len(body) > 0, "csrf.js body must not be empty"
+
+    def test_old_web_prefixed_path_returns_404(self, custom_handler_server):
+        """Regression guard: /web/css/styles.css must NOT resolve.
+
+        The v1.3.x bug was that the HTML used ``web/``-prefixed URLs while
+        the server root was already ``<webdir>`` (= ``web/``), so the path
+        resolved to ``<webdir>/web/css/styles.css``. With the fix, asset
+        URLs no longer carry the ``web/`` prefix and the double-nested
+        path correctly 404s. This test pins that contract so the prefix
+        cannot silently creep back.
+        """
+        url = f"{custom_handler_server['base_url']}/web/css/styles.css"
+        with pytest.raises(urllib.error.HTTPError) as exc:
+            urllib.request.urlopen(url, timeout=5)
+        assert exc.value.code == 404, (
+            f"Double-nested /web/... path must 404; got {exc.value.code}")
