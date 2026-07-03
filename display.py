@@ -389,10 +389,11 @@ def handle_exit_display(signum, frame, display_thread):
     shared_data.display_should_exit = True
     logger.info("Exit signal received. Waiting for the main loop to finish...")
     try:
-        # PORT-11: in headless mode main_loop has no epd hardware handle.
-        if main_loop and getattr(main_loop, "epd", None):
-            main_loop.epd.init(main_loop.epd.sleep)
-            main_loop.epd.Dev_exit()
+        # PORT-2: EPDManager exposes sleep(); the old code referenced a
+        # non-existent main_loop.epd and silently no-op'd. Headless mode
+        # (PORT-11) has no epd_helper at all.
+        if main_loop and getattr(main_loop, "epd_helper", None):
+            main_loop.epd_helper.sleep()
     except Exception as e:
         logger.error(f"Error while closing the display: {e}")
 

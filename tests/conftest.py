@@ -74,6 +74,7 @@ def mock_shared_data(monkeypatch):
 
     mock_epd = MagicMock()
     sys.modules['epd_helper'] = mock_epd
+    sys.modules['epd_manager'] = mock_epd
     sys.modules['resources'] = MagicMock()
     sys.modules['resources.waveshare_epd'] = MagicMock()
     # actions/scanning.py imports getmac + nmap (python-nmap) at module
@@ -92,7 +93,7 @@ def mock_shared_data(monkeypatch):
 
     yield shared_mock
 
-    for mod in ['init_shared', 'epd_helper', 'resources', 'resources.waveshare_epd',
+    for mod in ['init_shared', 'epd_helper', 'epd_manager', 'resources', 'resources.waveshare_epd',
                 'getmac', 'nmap', 'smb', 'smb.SMBConnection']:
         sys.modules.pop(mod, None)
 

@@ -25,7 +25,7 @@ import uuid
 import threading
 from PIL import Image, ImageFont 
 from logger import Logger
-from epd_helper import EPDHelper
+from epd_manager import EPDManager
 
 
 def _read_version():
@@ -286,8 +286,11 @@ class SharedData:
         try:
             logger.info("Initializing EPD display...")
             time.sleep(1)
-            self.epd_helper = EPDHelper(self.config["epd_type"])
-            self.epd_helper = EPDHelper(self.epd_type)
+            # PORT-2: EPDManager (singleton, SPI RLock, circuit breaker)
+            # supersedes EPDHelper. Attribute name kept as epd_helper so
+            # display.py call sites are unchanged; .epd still holds the raw
+            # Waveshare EPD object (.width/.height).
+            self.epd_helper = EPDManager(self.epd_type)
             if self.config["epd_type"] == "epd2in7":
                 logger.info("EPD type: epd2in7 screen reversed")
                 self.screen_reversed = False
