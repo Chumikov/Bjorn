@@ -127,63 +127,34 @@ class TestStealFilesSmbCloses:
 
 
 class TestSmbProgressContext:
-    def test_progress_update_inside_with_block(self):
-        """AST: the smbclient-fallback progress.update call must be inside
-        the with Progress(...) block of run_bruteforce.
+    """PORT-9: SMB bruteforce progress reporting via ProgressTracker.
 
-        The worker() method's progress.update() is fine because progress
-        and task_id are passed as explicit args. We only care about the
-        smbclient fallback in run_bruteforce.
-        """
+    The original SMB-3 bug was a NameError: the smbclient-fallback
+    ``progress.update(task_id, ...)`` ran OUTSIDE the ``with Progress(...)``
+    scope, so ``progress``/``task_id`` were undefined. PORT-9 replaced the
+    rich Progress bar with a module-level ``ProgressTracker`` — there is no
+    ``with`` scope to escape, so the NameError is now STRUCTURALLY
+    impossible. These tests pin the new contract.
+    """
+
+    def test_no_rich_progress_in_smb_connector(self):
+        """The rich Progress bar must be gone (replaced by ProgressTracker)."""
         with open("actions/smb_connector.py", encoding="utf-8") as f:
             src = f.read()
-        # Slice out run_bruteforce method only (start to next def at same indent)
-        start = src.index("def run_bruteforce")
-        # End at the next "def " at column 4 (method-level)
-        next_def = src.find("\n    def ", start + 20)
-        method_src = src[start:next_def if next_def != -1 else len(src)]
+        assert "from rich.progress import" not in src, (
+            "rich.progress import must be removed (PORT-9 ProgressTracker).")
+        assert "with Progress(" not in src, (
+            "No 'with Progress(' block should remain in smb_connector.")
 
-        # The smbclient fallback call we care about
-        fallback_call = "progress.update(task_id, advance=1)"
-        assert fallback_call in method_src, (
-            "Expected smbclient fallback progress.update call in run_bruteforce")
-
-        # Find the position of the fallback call
-        call_pos = method_src.index(fallback_call)
-        # Find the nearest "with Progress(...) as progress:" BEFORE the call
-        with_pos = method_src.rfind("with Progress(", 0, call_pos)
-        assert with_pos != -1, (
-            "smbclient fallback progress.update call must be inside a "
-            "with Progress(...) block")
-
-        # Check that the with-block extends past the call (the with body
-        # ends at the same indent as the with keyword). Find the with-block
-        # indent, then find where that indent returns.
-        with_line_start = method_src.rfind("\n", 0, with_pos) + 1
-        with_indent = len(method_src[with_line_start:with_line_start + len(method_src[with_line_start:])]) - len(method_src[with_line_start:].lstrip())
-        # Lines after the with that are at the SAME or LESS indent close the block
-        after_with = method_src[with_pos:]
-        # Find first line at indent <= with_indent (excluding the with line itself)
-        for line in after_with.split("\n")[1:]:
-            if not line.strip():
-                continue
-            line_indent = len(line) - len(line.lstrip())
-            if line_indent <= with_indent:
-                # This line is outside the with block
-                close_pos = method_src.index(line, with_pos)
-                if close_pos > call_pos:
-                    # Call is before the close — good
-                    return
-                else:
-                    # Close is before the call — call is OUTSIDE the with
-                    break
-        # If we didn't find a close before the call, the call is inside
-        # (the with block extends to end of method)
-        return  # call is inside the with block
-
-    def test_progress_update_in_source(self):
-        """Sanity: the smbclient fallback progress.update call exists."""
+    def test_smbclient_fallback_uses_tracker_advance(self):
+        """The smbclient-fallback loop must still report progress via the
+        tracker (so progress % keeps updating during the fallback)."""
         with open("actions/smb_connector.py", encoding="utf-8") as f:
             src = f.read()
-        assert "progress.update(task_id, advance=1)" in src, (
-            "Expected progress.update(task_id, advance=1) for smbclient fallback")
+        # Slice the smbclient fallback region (after 'smbclient -L for').
+        marker = "Trying smbclient -L for"
+        assert marker in src, "Expected smbclient fallback block."
+        fallback_src = src[src.index(marker):]
+        assert "tracker.advance()" in fallback_src, (
+            "smbclient fallback must call tracker.advance() to report progress.")
+

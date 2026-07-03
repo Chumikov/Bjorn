@@ -185,6 +185,18 @@ class SharedData:
             "timewait_ftp": 0,
             "timewait_sql": 0,
             "timewait_rdp": 0,
+            # PORT-9: optional exhaustive bruteforce generator (dormant by
+            # default). Connectors keep their dictionary-based attack unless
+            # bruteforce_exhaustive_enabled is set to True.
+            "bruteforce_exhaustive_enabled": False,
+            "bruteforce_exhaustive_min_length": 1,
+            "bruteforce_exhaustive_max_length": 4,
+            "bruteforce_exhaustive_max_candidates": 2000,
+            "bruteforce_exhaustive_lowercase": True,
+            "bruteforce_exhaustive_uppercase": True,
+            "bruteforce_exhaustive_digits": True,
+            "bruteforce_exhaustive_symbols": False,
+            "bruteforce_exhaustive_symbols_chars": "!@#$%^&*",
         }
 
     def update_mac_blacklist(self):
@@ -331,6 +343,7 @@ class SharedData:
         self.bjornorch_status = "IDLE"
         self.bjornstatustext = "IDLE"
         self.bjornstatustext2 = "Awakening..."
+        self.bjorn_progress = ""  # PORT-9: bruteforce % (set by ProgressTracker)
         self.scale_factor_x = self.width / self.ref_width
         self.scale_factor_y = self.height / self.ref_height
         self.text_frame_top = int(88 * self.scale_factor_x)

@@ -4,7 +4,7 @@ import threading
 import logging
 import time
 from rich.console import Console
-from rich.progress import Progress, BarColumn, TextColumn, SpinnerColumn
+from actions.bruteforce_common import ProgressTracker
 from ftplib import FTP
 from queue import Queue
 from shared import SharedData
@@ -104,7 +104,7 @@ class FTPConnector:
             except Exception:
                 pass
 
-    def worker(self, progress, task_id, success_flag):
+    def worker(self, tracker, success_flag):
         """
         Worker thread to process items in the queue.
         """
@@ -122,7 +122,7 @@ class FTPConnector:
                     self.removeduplicates()
                     success_flag[0] = True
             self.queue.task_done()
-            progress.update(task_id, advance=1)
+            tracker.advance()
 
     def run_bruteforce(self, adresse_ip, port):
         self.load_scan_file()  # Reload the scan file to get the latest IPs and ports
@@ -142,27 +142,27 @@ class FTPConnector:
         success_flag = [False]
         threads = []
 
-        with Progress(SpinnerColumn(), TextColumn("[progress.description]{task.description}"), BarColumn(), TextColumn("[progress.percentage]{task.percentage:>3.0f}%")) as progress:
-            task_id = progress.add_task("[cyan]Bruteforcing FTP...", total=total_tasks)
+        tracker = ProgressTracker(self.shared_data, total_tasks)
 
-            for _ in range(10):  # Limit threads for RPi Zero (512MB RAM, 1 core)
-                t = threading.Thread(target=self.worker, args=(progress, task_id, success_flag))
-                t.start()
-                threads.append(t)
+        for _ in range(10):  # Limit threads for RPi Zero (512MB RAM, 1 core)
+            t = threading.Thread(target=self.worker, args=(tracker, success_flag))
+            t.start()
+            threads.append(t)
 
-            while not self.queue.empty():
-                if self.shared_data.orchestrator_should_exit:
-                    logger.info("Orchestrator exit signal received, stopping bruteforce.")
-                    while not self.queue.empty():
-                        self.queue.get()
-                        self.queue.task_done()
-                    break
+        while not self.queue.empty():
+            if self.shared_data.orchestrator_should_exit:
+                logger.info("Orchestrator exit signal received, stopping bruteforce.")
+                while not self.queue.empty():
+                    self.queue.get()
+                    self.queue.task_done()
+                break
 
-            self.queue.join()
+        self.queue.join()
 
-            for t in threads:
-                t.join()
+        for t in threads:
+            t.join()
 
+        tracker.set_complete()
         return success_flag[0], self.results  # Return True and the list of successes if at least one attempt was successful
 
     def save_results(self):

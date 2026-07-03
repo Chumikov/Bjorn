@@ -37,7 +37,7 @@ class TestRDPConnectorNameError:
 
         with patch("actions.rdp_connector.pd.read_csv", return_value=mock_df), \
              patch("actions.rdp_connector.subprocess.Popen") as mock_popen, \
-             patch("actions.rdp_connector.Progress"):
+             patch("actions.rdp_connector.ProgressTracker"):
             mock_process = MagicMock()
             mock_process.communicate.return_value = (b"", b"")
             mock_process.returncode = 1

