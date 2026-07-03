@@ -24,6 +24,7 @@ import sys
 from PIL import Image, ImageDraw
 from init_shared import shared_data  
 from comment import Commentaireia
+from display_layout import DisplayLayout
 from logger import Logger
 import subprocess  
 
@@ -51,6 +52,9 @@ class Display:
                 "y": 160
             }
         }
+
+        # PORT-3: data-driven layout (replaces hardcoded coordinates in run()).
+        self.layout = DisplayLayout(self.shared_data)
 
         try:
             self.epd_helper = self.shared_data.epd_helper
@@ -294,51 +298,54 @@ class Display:
                 image = Image.new('1', (self.shared_data.width, self.shared_data.height))
                 draw = ImageDraw.Draw(image)
                 draw.rectangle((0, 0, self.shared_data.width, self.shared_data.height), fill=255)
-                draw.text((int(37 * self.scale_factor_x), int(5 * self.scale_factor_y)), "BJORN", font=self.shared_data.font_viking, fill=0)
-                draw.text((int(110 * self.scale_factor_x), int(170 * self.scale_factor_y)), self.manual_mode_txt, font=self.shared_data.font_arial14, fill=0)
-                
+                # PORT-3: all coordinates come from self.layout (data-driven).
+                # Values are identical to the pre-PORT-3 literals — verify with
+                # a side-by-side screenshot on the HW session.
+                def _pos(el):
+                    return (int(el["x"] * self.scale_factor_x),
+                            int(el["y"] * self.scale_factor_y))
+
+                draw.text(_pos(self.layout.get("title")), "BJORN", font=self.shared_data.font_viking, fill=0)
+                draw.text(_pos(self.layout.get("manual_mode")), self.manual_mode_txt, font=self.shared_data.font_arial14, fill=0)
+
                 if self.shared_data.wifi_connected:
-                    image.paste(self.shared_data.wifi, (int(3 * self.scale_factor_x), int(3 * self.scale_factor_y)))
+                    image.paste(self.shared_data.wifi, _pos(self.layout.get("wifi_icon")))
                 # # # if self.shared_data.bluetooth_active:
                 # # #     image.paste(self.shared_data.bluetooth, (int(23 * self.scale_factor_x), int(4 * self.scale_factor_y)))
                 if self.shared_data.pan_connected:
-                    image.paste(self.shared_data.connected, (int(104 * self.scale_factor_x), int(3 * self.scale_factor_y)))
+                    image.paste(self.shared_data.connected, _pos(self.layout.get("pan_icon")))
                 if self.shared_data.usb_active:
-                    image.paste(self.shared_data.usb, (int(90 * self.scale_factor_x), int(4 * self.scale_factor_y)))
+                    image.paste(self.shared_data.usb, _pos(self.layout.get("usb_icon")))
 
-                stats = [
-                    (self.shared_data.target, (int(8 * self.scale_factor_x), int(22 * self.scale_factor_y)), (int(28 * self.scale_factor_x), int(22 * self.scale_factor_y)), str(self.shared_data.targetnbr)),
-                    (self.shared_data.port, (int(47 * self.scale_factor_x), int(22 * self.scale_factor_y)), (int(67 * self.scale_factor_x), int(22 * self.scale_factor_y)), str(self.shared_data.portnbr)),
-                    (self.shared_data.vuln, (int(86 * self.scale_factor_x), int(22 * self.scale_factor_y)), (int(106 * self.scale_factor_x), int(22 * self.scale_factor_y)), str(self.shared_data.vulnnbr)),
-                    (self.shared_data.cred, (int(8 * self.scale_factor_x), int(41 * self.scale_factor_y)), (int(28 * self.scale_factor_x), int(41 * self.scale_factor_y)), str(self.shared_data.crednbr)),
-                    (self.shared_data.money, (int(3 * self.scale_factor_x), int(172 * self.scale_factor_y)), (int(3 * self.scale_factor_x), int(192 * self.scale_factor_y)), str(self.shared_data.coinnbr)),
-                    (self.shared_data.level, (int(2 * self.scale_factor_x), int(217 * self.scale_factor_y)), (int(4 * self.scale_factor_x), int(237 * self.scale_factor_y)), str(self.shared_data.levelnbr)),
-                    (self.shared_data.zombie, (int(47 * self.scale_factor_x), int(41 * self.scale_factor_y)), (int(67 * self.scale_factor_x), int(41 * self.scale_factor_y)), str(self.shared_data.zombiesnbr)),
-                    (self.shared_data.networkkb, (int(102 * self.scale_factor_x), int(190 * self.scale_factor_y)), (int(102 * self.scale_factor_x), int(208 * self.scale_factor_y)), str(self.shared_data.networkkbnbr)),
-                    (self.shared_data.data, (int(86 * self.scale_factor_x), int(41 * self.scale_factor_y)), (int(106 * self.scale_factor_x), int(41 * self.scale_factor_y)), str(self.shared_data.datanbr)),
-                    (self.shared_data.attacks, (int(100 * self.scale_factor_x), int(218 * self.scale_factor_y)), (int(102 * self.scale_factor_x), int(237 * self.scale_factor_y)), str(self.shared_data.attacksnbr)),
-                ]
-
-                for img, img_pos, text_pos, text in stats:
-                    image.paste(img, img_pos)
-                    draw.text(text_pos, text, font=self.shared_data.font_arial9, fill=0)
+                # Stats row: iterate layout stats, bind icon/counter by attr name.
+                for stat in self.layout.stats():
+                    img = getattr(self.shared_data, stat["stat_attr"], None)
+                    count = getattr(self.shared_data, stat["count_attr"], "")
+                    if img is None:
+                        continue
+                    image.paste(img, _pos(stat["img"]))
+                    draw.text(_pos(stat["text"]), str(count), font=self.shared_data.font_arial9, fill=0)
 
                 self.shared_data.update_bjornstatus()
-                image.paste(self.shared_data.bjornstatusimage, (int(3 * self.scale_factor_x), int(60 * self.scale_factor_y)))
-                draw.text((int(35 * self.scale_factor_x), int(65 * self.scale_factor_y)), self.shared_data.bjornstatustext, font=self.shared_data.font_arial9, fill=0)
-                draw.text((int(35 * self.scale_factor_x), int(75 * self.scale_factor_y)), self.shared_data.bjornstatustext2, font=self.shared_data.font_arial9, fill=0)
+                image.paste(self.shared_data.bjornstatusimage, _pos(self.layout.get("status_image")))
+                draw.text(_pos(self.layout.get("status_line1")), self.shared_data.bjornstatustext, font=self.shared_data.font_arial9, fill=0)
+                draw.text(_pos(self.layout.get("status_line2")), self.shared_data.bjornstatustext2, font=self.shared_data.font_arial9, fill=0)
 
-                # Get frise position based on display type
-                frise_x, frise_y = self.get_frise_position()
-                image.paste(self.shared_data.frise, (frise_x, frise_y))
+                # Frise position is EPD-type-dependent in the layout.
+                frise = self.layout.frise()
+                image.paste(self.shared_data.frise, _pos(frise))
 
-                draw.rectangle((1, 1, self.shared_data.width - 1, self.shared_data.height - 1), outline=0)
-                draw.line((1, 20, self.shared_data.width - 1, 20), fill=0)
-                draw.line((1, 59, self.shared_data.width - 1, 59), fill=0)
-                draw.line((1, 87, self.shared_data.width - 1, 87), fill=0)
+                border = self.layout.get("border")
+                draw.rectangle((int(border["x0"] * self.scale_factor_x),
+                                int(border["y0"] * self.scale_factor_y),
+                                self.shared_data.width - 1, self.shared_data.height - 1), outline=0)
+                for line_key in ("line_top", "line_mid", "line_lower"):
+                    ly = int(self.layout.get(line_key, "y") * self.scale_factor_y)
+                    draw.line((1, ly, self.shared_data.width - 1, ly), fill=0)
 
                 lines = self.shared_data.wrap_text(self.shared_data.bjornsay, self.shared_data.font_arialbold, self.shared_data.width - 4)
-                y_text = int(90 * self.scale_factor_y)
+                comment = self.layout.get("comment_text")
+                y_text = int(comment["y_start"] * self.scale_factor_y)
 
                 if self.main_image is not None:
                     image.paste(self.main_image, (self.shared_data.x_center1, self.shared_data.y_bottom1))
@@ -346,7 +353,7 @@ class Display:
                     logger.error("Main image not found in shared_data.")
 
                 for line in lines:
-                    draw.text((int(4 * self.scale_factor_x), y_text), line, font=self.shared_data.font_arialbold, fill=0)
+                    draw.text((int(comment["x"] * self.scale_factor_x), y_text), line, font=self.shared_data.font_arialbold, fill=0)
                     y_text += (self.shared_data.font_arialbold.getbbox(line)[3] - self.shared_data.font_arialbold.getbbox(line)[1]) + 3
 
                 if self.screen_reversed:
