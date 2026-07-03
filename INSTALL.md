@@ -95,7 +95,6 @@ sudo apt-get update && sudo apt-get upgrade -y
   libssl-dev \
   libgpiod-dev \
   libi2c-dev \
-  libatlas-base-dev \
   build-essential \
   python3-pip \
   wget \

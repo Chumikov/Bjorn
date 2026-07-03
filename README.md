@@ -103,16 +103,16 @@ e-Paper HAT дисплей и веб-интерфейс обеспечивают
 до v1.3.1 падают на определении платы. Используй v1.3.3+ для
 гарантированной совместимости.
 
-### ⚠️ Важно про Debian Trixie (13)
+### ✅ Debian Trixie (13)
 
-Текущая стабильная RPi OS основана на Debian 13 (Trixie, образ
-`2026-04-21-raspios-trixie-*`). **Bjorn пока НЕ поддерживает Trixie**:
-пакет `libatlas-base-dev` удалён в Trixie, и `install_bjorn.sh` падает
-на apt-установке.
+Начиная с **v1.4.0** Bjorn поддерживает и Bookworm (12), и Trixie (13).
+Раньше установщик падал на `libatlas-base-dev` (пакет удалён в Trixie), но
+после v1.3.0 (DEP-1) numpy убран из зависимостей — pandas 2.x использует
+OpenBLAS (`libopenblas-dev`), и ATLAS больше не нужен. `install_bjorn.sh`
+теперь принимает обе версии ОС (12 и 13).
 
-Используйте **RPi OS Legacy** (Bookworm) пока не выйдет Bjorn v1.4.0 с
-адаптацией под Trixie. Скачать: [raspberrypi.com/software/operating-systems](https://www.raspberrypi.com/software/operating-systems/)
-→ "Raspberry Pi OS (Legacy, 64-bit)" → "Raspberry Pi OS (Legacy) Lite".
+Можно использовать как актуальную RPi OS (Trixie), так и Legacy (Bookworm):
+[raspberrypi.com/software/operating-systems](https://www.raspberrypi.com/software/operating-systems/).
 
 **Persistent journal рекомендуется** для диагностики crash-loop-ов (по
 умолчанию RPi OS использует volatile journal, который теряет логи между

@@ -145,21 +145,20 @@ check_system_compatibility() {
             should_ask_confirmation=true
         fi
         
-        # Compare versions (expecting Bookworm = 12)
-        expected_version="12"
-        if [ "$VERSION_ID" != "$expected_version" ]; then
-            log "WARNING" "Different OS version detected"
-            echo -e "${YELLOW}This script was tested with Raspbian GNU/Linux 12 (bookworm)${NC}"
-            echo -e "${YELLOW}Current system: ${PRETTY_NAME}${NC}"
-            if [ "$VERSION_ID" -lt "$expected_version" ]; then
-                echo -e "${YELLOW}Your system version ($VERSION_ID) is older than recommended ($expected_version)${NC}"
-            elif [ "$VERSION_ID" -gt "$expected_version" ]; then
-                echo -e "${YELLOW}Your system version ($VERSION_ID) is newer than tested ($expected_version)${NC}"
-            fi
-            should_ask_confirmation=true
-        else
-            log "SUCCESS" "OS version check passed: ${PRETTY_NAME}"
-        fi
+        # Compare versions — tested with Bookworm (12) и Trixie (13).
+        # BACK-12 (v1.4.0): Trixie теперь поддерживается.
+        case "$VERSION_ID" in
+            12|13)
+                log "SUCCESS" "OS version check passed: ${PRETTY_NAME}"
+                ;;
+            *)
+                log "WARNING" "Untested OS version"
+                echo -e "${YELLOW}This script was tested with Raspbian GNU/Linux 12 (bookworm) and 13 (trixie)${NC}"
+                echo -e "${YELLOW}Current system: ${PRETTY_NAME}${NC}"
+                echo -e "${YELLOW}Your system version ($VERSION_ID) is outside the tested range (12-13)${NC}"
+                should_ask_confirmation=true
+                ;;
+        esac
     else
         log "WARNING" "Could not determine OS version (/etc/os-release not found)"
         should_ask_confirmation=true
@@ -230,7 +229,9 @@ install_dependencies() {
         "libssl-dev"
         "libgpiod-dev"
         "libi2c-dev"
-        "libatlas-base-dev"
+        # libatlas-base-dev удалён (v1.4.0/BACK-12): пакет отсутствует в
+        # Debian 13 (Trixie), а после DEP-1 (v1.3.0) numpy убран — pandas
+        # 2.x использует OpenBLAS (libopenblas-dev выше), ATLAS не нужен.
         "build-essential"
         "smbclient"          # SMB fallback path в smb_connector.py: smbclient -L
         "wireless-tools"     # iwgetid / iwlist для /scan_wifi endpoint
