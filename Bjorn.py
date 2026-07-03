@@ -29,6 +29,7 @@ from comment import Commentaireia
 from webapp import web_thread, handle_exit_web
 from orchestrator import Orchestrator
 from instance_lock import acquire_instance_lock, release_instance_lock
+from health_monitor import HealthMonitor
 from logger import Logger
 
 logger = Logger(name="Bjorn.py", level=logging.DEBUG)
@@ -185,6 +186,10 @@ if __name__ == "__main__":
             logger.info("Starting the web server...")
             web_thread.start()
 
+        # PORT-5: runtime health monitor (threads / RSS / FDs / EPD stats).
+        health_monitor = HealthMonitor(shared_data)
+        health_monitor.start()
+
         signal.signal(signal.SIGINT, lambda sig, frame: handle_exit(sig, frame, display_thread, bjorn_thread, web_thread))
         signal.signal(signal.SIGTERM, lambda sig, frame: handle_exit(sig, frame, display_thread, bjorn_thread, web_thread))
 
@@ -195,6 +200,8 @@ if __name__ == "__main__":
         logger.info("Bjorn main thread waiting for bjorn_thread to exit...")
         bjorn_thread.join()
         logger.info("bjorn_thread exited; cleaning up display and web threads...")
+        # PORT-5: stop the health monitor before joining the rest.
+        health_monitor.stop()
         # PORT-11: display_thread is None in headless mode.
         if display_thread and display_thread.is_alive():
             display_thread.join(timeout=10)
