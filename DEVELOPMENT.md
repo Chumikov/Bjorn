@@ -373,6 +373,22 @@ Commits (`fix`/`feat`/`docs`/`chore`/`refactor`/`test`) остаётся на
 английском, scope и описание — на русском. См. [CONTRIBUTING.md §«Формат
 коммитов»](CONTRIBUTING.md).
 
+### 📚 Актуальность документации перед релизом
+
+**Перед каждым тегом релиза вся документация должна быть актуализирована и
+согласована с кодом.** Релиз не закрывается, пока не проверены:
+
+- текущая версия (`version.txt`) во всех упоминаниях в телах доков;
+- supported-versions table в [SECURITY.md](SECURITY.md);
+- дата OS-образа и версия ядра в [README.md](README.md) / [INSTALL.md](INSTALL.md);
+- команды и цифры тестов (количество, coverage-gate) в этом файле и
+  [tests/COVERAGE.md](tests/COVERAGE.md);
+- дефолтные креды/настройки (например, web-auth `admin:bjorn`);
+- ссылки ведут на форк `Chumikov/Bjorn`, а не на upstream `infinition`.
+
+Полный аудит-чеклист и последовательность релиза — в `AGENTS.md` (раздел
+«Release checklist»). История аудита v1.3.4 — пример полного прогона.
+
 ### 🔧 Git executable bit
 
 Любой скрипт, который запускается через `Exec*` в systemd unit или напрямую
