@@ -1,0 +1,33 @@
+# OS files  
+.DS_Store  
+Thumbs.db  
+desktop.ini  
+  
+# IDE files  
+.vscode/  
+.idea/  
+*.swp  
+*.swo  
+  
+# Node.js  
+node_modules/  
+npm-debug.log*  
+yarn-debug.log*  
+yarn-error.log*  
+.npm/  
+  
+# Project specific  
+.gemini/  
+.env  
+.env.local  
+.env.*.local  
+dist/  
+build/ 
+  
+# Wiki Content (Keep empty for template)  
+wiki/docs/*  
+!wiki/docs/.gitkeep 
+
+# Wiki Content (Keep empty for template)
+wiki/docs/*
+!wiki/docs/.gitkeep

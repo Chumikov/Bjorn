@@ -1,0 +1,4 @@
+Contact: https://github.com/Chumikov/Bjorn/issues
+Expires: 2027-01-24T15:36:48.000Z
+Preferred-Languages: en, fr
+Policy: https://github.com/Chumikov/Bjorn/blob/main/SECURITY.md
