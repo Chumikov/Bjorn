@@ -408,6 +408,11 @@ class SharedData:
                     module_name = filename[:-3]
                     try:
                         module = importlib.import_module(f'actions.{module_name}')
+                        # Action modules are identified by a ``b_class``
+                        # attribute. Helper modules (e.g. bruteforce_common)
+                        # legitimately lack it — skip silently.
+                        if not hasattr(module, 'b_class'):
+                            continue
                         b_class = getattr(module, 'b_class')
                         b_status = getattr(module, 'b_status')
                         b_port = getattr(module, 'b_port', None)
@@ -421,8 +426,6 @@ class SharedData:
                         })
                         #add each b_class to the status list
                         self.status_list.append(b_class)
-                    except AttributeError as e:
-                        logger.error(f"Module {module_name} is missing required attributes: {e}")
                     except ImportError as e:
                         logger.error(f"Error importing module {module_name}: {e}")
                     except Exception as e:
