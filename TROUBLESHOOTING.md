@@ -150,18 +150,20 @@ detection (`/proc/cpuinfo` + `/etc/rpi-issue` + `/proc/device-tree/model`).
 
 ### 🌐 Веб-интерфейс
 
-#### Не могу войти — браузер запрашивает логин/пароль (401)
+#### Не могу войти — браузер запрашивает логин/пароль
 
-Веб-интерфейс защищён **HTTP Basic Auth** (с v1.3.0). Учётные данные по
-умолчанию:
+Начиная с **v1.4.0** вход — через **страницу логина** (`/login`): при
+обращении к любой странице без активной сессии браузер получает redirect на
+`/login`. Учётные данные по умолчанию:
 
 - **Логин:** `admin`
 - **Пароль:** `bjorn`
 
-Сменить пароль или отключить аутентификацию — в
-`config/shared_config.json` (ключи `web_username` / `web_password` /
-`web_auth_enabled`) либо через страницу конфигурации. Подробности в
-[SECURITY.md](SECURITY.md).
+Пароль хранится salted+hashed (PBKDF2-SHA256). Сменить пароль/отключить
+аутентификацию — в `config/shared_config.json` (ключи `web_username` /
+`web_password` / `web_auth_enabled`) либо через страницу конфигурации.
+Для curl/API сохранён Basic Auth: `curl -u admin:bjorn http://[ip]:8000/...`.
+Выход — кнопка/`POST /logout`. Подробности в [SECURITY.md](SECURITY.md).
 
 #### Нет CSS, иконок, вёрстки (страница «голая»)
 
