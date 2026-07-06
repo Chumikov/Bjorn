@@ -366,6 +366,61 @@ pylint <файл_или_директория>
   user-facing функций. См. `tests/test_runtime_smoke.py` для AST-проверок
   threading lifecycle.
 
+### 🖥️ Виртуальное тестирование (headless в ВМ)
+
+**После каждого наката обновлений на SD-карту — ОБЯЗАТЕЛЬНО прогнать
+virtual headless-тест в ВМ.** Это ловит регрессии веб-слоя/логики за
+секунды, до медленного физического цикла (карта → RPi → тест → вынуть →
+правка → redeploy). Реальный RPi + e-Paper HAT нужен только для проверки
+**визуального рендера экрана** (~10% функционала); всё остальное
+(веб-логин, сессии, config, instance lock, health monitor, CSRF,
+security headers) тестируется headless в VirtualBox.
+
+Headless-режим (`epd_type:"none"`, PORT-11) пропускает EPD-инициализацию,
+и веб-интерфейс становится основным. Процедура (на хосте-ВМ, БЕЗ карты):
+
+```bash
+cd /home/kali/Projects/Bjorn
+
+# 1. Временный headless-конфиг (loopback, без EPD). Файл трекается —
+#    правим локально и revert'им в конце.
+python3 -c "
+import json
+p='config/shared_config.json'
+c=json.load(open(p))
+c['epd_type']='none'
+c['web_bind_address']='127.0.0.1'
+json.dump(c,open(p,'w'),indent=4,ensure_ascii=False)
+"
+
+# 2. Убедиться, что runtime-deps установлены (если ВМ свежая):
+pip install -r requirements.txt --break-system-packages
+
+# 3. Запустить Bjorn headless в фоне.
+nohup python3 Bjorn.py > /tmp/bjorn_headless.log 2>&1 &
+sleep 5
+
+# 4. Проверки (ожидаемый результат в комментарии):
+curl -s -u admin:bjorn http://127.0.0.1:8000/version                 # {"version":"1.4.0"}
+curl -s -o /dev/null -w '%{http_code} %{redirect_url}\n' http://127.0.0.1:8000/   # 302 .../login
+curl -s -i -X POST http://127.0.0.1:8000/login \
+   -H 'Content-Type: application/json' \
+   -d '{"username":"admin","password":"bjorn"}' | grep -i set-cookie  # bjorn_session=...
+grep -o 'health thread_count=[0-9]* rss_kb=[0-9]* fd_count=[0-9]*' /tmp/bjorn_headless.log | head -1
+
+# 5. Остановить и восстановить конфиг.
+pkill -f 'python3 Bjorn.py'
+git checkout config/shared_config.json
+```
+
+Что проверяем (минимум): `version` → корректная; `/` без auth → 302 на
+`/login`; `POST /login` → `Set-Cookie: bjorn_session`; `health`-строка в
+логе. Опционально: открыть `http://127.0.0.1:8000` в браузере хоста (через
+port-forward ВМ) и пройти логин руками.
+
+**Не тестируется в ВМ** (нужен RPi + HAT): EPD-рендер (PORT-2/3/6 — пиксели
+на реальном экране), SPI/GPIO, реальное сканирование сети.
+
 ### 📝 Конвенция коммитов
 
 Сообщения коммитов и релизные артефакты — **на русском**. Тип Conventional
