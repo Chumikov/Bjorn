@@ -79,6 +79,7 @@ BUILTIN_LAYOUTS = {
     "epd2in13_V2": DEFAULT_LAYOUT,
     "epd2in13_V3": DEFAULT_LAYOUT,
     "epd2in13_V4": DEFAULT_LAYOUT,
+    "preview": DEFAULT_LAYOUT,
     "epd2in7": LAYOUT_EPD2IN7,
 }
 
