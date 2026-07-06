@@ -132,35 +132,38 @@ def _parse_session_cookie(cookie_header, name=_SESSION_COOKIE):
 
 
 def _ensure_password_hashed(shared, cfg):
-    """Migrate plaintext web_password → web_password_hash+salt (once, idempotent).
+    """Hash/refresh the web password.
 
-    Persists the hash into shared.config and saves it. Updates ``cfg`` with
-    password_hash/password_salt so callers verify against the hash.
+    If a plaintext ``web_password`` is present in config (non-empty), it is
+    (re)hashed into ``web_password_hash``+``web_password_salt`` and the
+    plaintext is removed. This covers BOTH the first-run migration AND a
+    password change (set ``web_password`` to the new value, restart, done).
+    If no plaintext is set, the existing hash is used (normal steady state).
     """
     config = getattr(shared, "config", None)
     if not isinstance(config, dict):
         return cfg
+    plaintext = cfg.get("password") or config.get("web_password")
+    if plaintext:
+        new_hash, new_salt = _hash_password(plaintext)
+        config["web_password_hash"] = new_hash
+        config["web_password_salt"] = new_salt
+        config.pop("web_password", None)  # don't keep plaintext once hashed
+        try:
+            if hasattr(shared, "save_config"):
+                shared.save_config()
+        except Exception as e:
+            logger.error(f"Could not persist hashed password: {e}")
+        cfg["password_hash"] = new_hash
+        cfg["password_salt"] = new_salt
+        cfg["password"] = ""
+        return cfg
+    # No plaintext set — use the stored hash (normal steady state).
     stored_hash = config.get("web_password_hash")
     stored_salt = config.get("web_password_salt")
     if stored_hash and stored_salt:
         cfg["password_hash"] = stored_hash
         cfg["password_salt"] = stored_salt
-        return cfg
-    plaintext = cfg.get("password") or config.get("web_password")
-    if not plaintext:
-        return cfg
-    new_hash, new_salt = _hash_password(plaintext)
-    config["web_password_hash"] = new_hash
-    config["web_password_salt"] = new_salt
-    config.pop("web_password", None)  # don't keep plaintext once hashed
-    try:
-        if hasattr(shared, "save_config"):
-            shared.save_config()
-    except Exception as e:
-        logger.error(f"Could not persist hashed password: {e}")
-    cfg["password_hash"] = new_hash
-    cfg["password_salt"] = new_salt
-    cfg["password"] = ""
     return cfg
 
 

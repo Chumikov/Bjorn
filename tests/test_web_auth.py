@@ -246,6 +246,70 @@ class TestBindAddress:
             "WebThread.run must not bind to '' (hard-coded).")
 
 
+class TestPasswordHashing:
+    """PORT-8: _ensure_password_hashed — migration + password change.
+
+    The key invariant: setting a plaintext ``web_password`` MUST always
+    (re)hash it, even when a hash already exists. This is what makes
+    password rotation a one-step operation (set web_password, restart)."""
+
+    def test_first_migration_hashes_plaintext(self):
+        sys.modules.pop('webapp', None)
+        import webapp
+        shared = MagicMock()
+        shared.config = {"web_username": "admin", "web_password": "bjorn"}
+        shared.save_config = MagicMock()
+        cfg = {"username": "admin", "password": "bjorn"}
+        webapp._ensure_password_hashed(shared, cfg)
+        assert "web_password_hash" in shared.config
+        assert "web_password_salt" in shared.config
+        assert shared.config.get("web_password") is None, (
+            "Plaintext must be removed once hashed.")
+        assert cfg["password_hash"] and cfg["password_salt"]
+        shared.save_config.assert_called_once()
+
+    def test_password_change_rehashes_when_hash_exists(self):
+        """Regression: previously setting web_password after the first
+        migration was IGNORED (hash took precedence). Now it must re-hash."""
+        sys.modules.pop('webapp', None)
+        import webapp
+        shared = MagicMock()
+        # Simulate steady state: hash exists, no plaintext.
+        old_hash, old_salt = webapp._hash_password("oldpw")
+        shared.config = {"web_username": "admin",
+                         "web_password_hash": old_hash,
+                         "web_password_salt": old_salt}
+        shared.save_config = MagicMock()
+
+        # Operator sets a new plaintext password to rotate.
+        shared.config["web_password"] = "newpw"
+        cfg = {"username": "admin", "password": "newpw"}
+        webapp._ensure_password_hashed(shared, cfg)
+
+        assert shared.config["web_password_hash"] != old_hash, (
+            "New plaintext MUST produce a different hash (re-hash happened).")
+        assert webapp._verify_password("newpw", shared.config["web_password_hash"],
+                                       shared.config["web_password_salt"]), (
+            "After rotation the new password must verify against the new hash.")
+        assert not webapp._verify_password("oldpw", shared.config["web_password_hash"],
+                                           shared.config["web_password_salt"]), (
+            "Old password must NO LONGER verify after rotation.")
+        assert shared.config.get("web_password") is None
+
+    def test_no_plaintext_uses_stored_hash(self):
+        sys.modules.pop('webapp', None)
+        import webapp
+        shared = MagicMock()
+        h, s = webapp._hash_password("bjorn")
+        shared.config = {"web_password_hash": h, "web_password_salt": s}
+        shared.save_config = MagicMock()
+        cfg = {"username": "admin", "password": ""}
+        webapp._ensure_password_hashed(shared, cfg)
+        assert cfg["password_hash"] == h
+        assert cfg["password_salt"] == s
+        shared.save_config.assert_not_called(), "No re-hash when no plaintext."
+
+
 class TestConfigDefaults:
     """WEB-8/9: shared_config.json + SharedData defaults must expose keys."""
 
