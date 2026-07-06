@@ -350,7 +350,7 @@ pytest tests/test_web_auth.py -v
 pylint <файл_или_директория>
 ```
 
-Текущее состояние (v1.4.0): **349 тестов**, покрытие ~34.4% (gate
+Текущее состояние (v1.4.0): **352 теста**, покрытие ~34.4% (gate
 `--cov-fail-under=30` в `pytest.ini`). Целевой ориентир — 50% (запланирован
 на v1.4.0 через backfill тестов для `Bjorn.py`, `orchestrator.py`,
 `display.py`, `comment.py`).
@@ -418,8 +418,16 @@ git checkout config/shared_config.json
 логе. Опционально: открыть `http://127.0.0.1:8000` в браузере хоста (через
 port-forward ВМ) и пройти логин руками.
 
-**Не тестируется в ВМ** (нужен RPi + HAT): EPD-рендер (PORT-2/3/6 — пиксели
-на реальном экране), SPI/GPIO, реальное сканирование сети.
+**Не тестируется в ВМ** (нужен RPi + HAT): SPI/GPIO bus behavior.
+
+### 📺 Preview-режим (эмулятор экрана, v1.4.0)
+
+Для визуальной проверки экрана без e-Paper HAT установите `"epd_type":"preview"`
+в конфиге. Загружается mock-драйвер (`resources/waveshare_epd/preview.py`) —
+display-поток запускается полностью (layout, арт, статистика, комментарии),
+но вместо SPI каждый кадр пишется в `web/screen.png`. Откройте вкладку Bjorn
+(`http://<host>:8000/bjorn.html`) — увидите live-view экрана. Позволяет
+тестировать PORT-2/3/6 (EPDManager, DisplayLayout, арт) без железа.
 
 ### 📝 Конвенция коммитов
 

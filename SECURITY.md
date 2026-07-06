@@ -52,6 +52,15 @@ Basic сохранён как fallback для curl/API-клиентов.
 > отзыв через `/logout`. Basic Auth по-прежнему принимает `admin:bjorn` для
 > curl/API.
 
+#### Смена пароля
+
+1. Отредактируйте `config/shared_config.json`: установите `"web_password": "<новый пароль>"`.
+2. Перезапустите сервис: `sudo systemctl restart bjorn.service`.
+3. При первом запросе новый пароль автоматически перехэшируется (старый hash заменяется).
+
+> Не редактируйте `web_password_hash` / `web_password_salt` напрямую —
+> установка `web_password` (plaintext) — единственный правильный способ.
+
 ### Security-заголовки
 
 Каждый ответ автоматически несёт (WEB-4):
