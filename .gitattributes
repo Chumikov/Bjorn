@@ -5,3 +5,6 @@
 docs/images/*.png binary
 docs/images/*.jpg binary
 docs/images/*.jpeg binary
+resources/images/**/*.bmp binary
+resources/images/**/*.png binary
+resources/fonts/*.ttf binary
