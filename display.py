@@ -265,96 +265,86 @@ class Display:
             logger.error(f"Error checking USB connection status: {e}")
             return False
 
+    def render_frame(self, image, draw):
+        """Draw all UI elements onto the PIL image.
+
+        Extracted from run() for testability (REF-1) — can be called
+        directly without running the threading loop.
+        """
+        def _pos(el):
+            return (int(el["x"] * self.scale_factor_x),
+                    int(el["y"] * self.scale_factor_y))
+
+        draw.text(_pos(self.layout.get("title")), "BJORN", font=self.shared_data.font_viking, fill=0)
+        draw.text(_pos(self.layout.get("manual_mode")), self.manual_mode_txt, font=self.shared_data.font_arial14, fill=0)
+
+        if self.shared_data.wifi_connected:
+            image.paste(self.shared_data.wifi, _pos(self.layout.get("wifi_icon")))
+        if self.shared_data.pan_connected:
+            image.paste(self.shared_data.connected, _pos(self.layout.get("pan_icon")))
+        if self.shared_data.usb_active:
+            image.paste(self.shared_data.usb, _pos(self.layout.get("usb_icon")))
+
+        for stat in self.layout.stats():
+            img = getattr(self.shared_data, stat["stat_attr"], None)
+            count = getattr(self.shared_data, stat["count_attr"], "")
+            if img is None:
+                continue
+            image.paste(img, _pos(stat["img"]))
+            draw.text(_pos(stat["text"]), str(count), font=self.shared_data.font_arial9, fill=0)
+
+        self.shared_data.update_bjornstatus()
+        image.paste(self.shared_data.bjornstatusimage, _pos(self.layout.get("status_image")))
+        draw.text(_pos(self.layout.get("status_line1")), self.shared_data.bjornstatustext, font=self.shared_data.font_arial9, fill=0)
+        draw.text(_pos(self.layout.get("status_line2")), self.shared_data.bjornstatustext2, font=self.shared_data.font_arial9, fill=0)
+
+        frise = self.layout.frise()
+        image.paste(self.shared_data.frise, _pos(frise))
+
+        border = self.layout.get("border")
+        draw.rectangle((int(border["x0"] * self.scale_factor_x),
+                        int(border["y0"] * self.scale_factor_y),
+                        self.shared_data.width - 1, self.shared_data.height - 1), outline=0)
+        for line_key in ("line_top", "line_mid", "line_lower"):
+            ly = int(self.layout.get(line_key, "y") * self.scale_factor_y)
+            draw.line((1, ly, self.shared_data.width - 1, ly), fill=0)
+
+        lines = self.shared_data.wrap_text(self.shared_data.bjornsay, self.shared_data.font_arialbold, self.shared_data.width - 4)
+        comment = self.layout.get("comment_text")
+        y_text = int(comment["y_start"] * self.scale_factor_y)
+
+        if self.main_image is not None:
+            image.paste(self.main_image, (self.shared_data.x_center1, self.shared_data.y_bottom1))
+        else:
+            logger.error("Main image not found in shared_data.")
+
+        for line in lines:
+            draw.text((int(comment["x"] * self.scale_factor_x), y_text), line, font=self.shared_data.font_arialbold, fill=0)
+            y_text += (self.shared_data.font_arialbold.getbbox(line)[3] - self.shared_data.font_arialbold.getbbox(line)[1]) + 3
+
     def run(self):
         """Main loop for updating the EPD display with shared data."""
         self.manual_mode_txt = ""
         while not self.shared_data.display_should_exit:
             try:
-                # PORT-11: hardware push only when an EPD is present.
                 if self.epd_helper:
                     self.epd_helper.init_partial_update()
                 self.display_comment(self.shared_data.bjornorch_status)
                 image = Image.new('1', (self.shared_data.width, self.shared_data.height))
                 draw = ImageDraw.Draw(image)
                 draw.rectangle((0, 0, self.shared_data.width, self.shared_data.height), fill=255)
-                # PORT-3: all coordinates come from self.layout (data-driven).
-                # Values are identical to the pre-PORT-3 literals — verify with
-                # a side-by-side screenshot on the HW session.
-                def _pos(el):
-                    return (int(el["x"] * self.scale_factor_x),
-                            int(el["y"] * self.scale_factor_y))
-
-                draw.text(_pos(self.layout.get("title")), "BJORN", font=self.shared_data.font_viking, fill=0)
-                draw.text(_pos(self.layout.get("manual_mode")), self.manual_mode_txt, font=self.shared_data.font_arial14, fill=0)
-
-                if self.shared_data.wifi_connected:
-                    image.paste(self.shared_data.wifi, _pos(self.layout.get("wifi_icon")))
-                # # # if self.shared_data.bluetooth_active:
-                # # #     image.paste(self.shared_data.bluetooth, (int(23 * self.scale_factor_x), int(4 * self.scale_factor_y)))
-                if self.shared_data.pan_connected:
-                    image.paste(self.shared_data.connected, _pos(self.layout.get("pan_icon")))
-                if self.shared_data.usb_active:
-                    image.paste(self.shared_data.usb, _pos(self.layout.get("usb_icon")))
-
-                # Stats row: iterate layout stats, bind icon/counter by attr name.
-                for stat in self.layout.stats():
-                    img = getattr(self.shared_data, stat["stat_attr"], None)
-                    count = getattr(self.shared_data, stat["count_attr"], "")
-                    if img is None:
-                        continue
-                    image.paste(img, _pos(stat["img"]))
-                    draw.text(_pos(stat["text"]), str(count), font=self.shared_data.font_arial9, fill=0)
-
-                self.shared_data.update_bjornstatus()
-                image.paste(self.shared_data.bjornstatusimage, _pos(self.layout.get("status_image")))
-                draw.text(_pos(self.layout.get("status_line1")), self.shared_data.bjornstatustext, font=self.shared_data.font_arial9, fill=0)
-                draw.text(_pos(self.layout.get("status_line2")), self.shared_data.bjornstatustext2, font=self.shared_data.font_arial9, fill=0)
-
-                # Frise position is EPD-type-dependent in the layout.
-                frise = self.layout.frise()
-                image.paste(self.shared_data.frise, _pos(frise))
-
-                border = self.layout.get("border")
-                draw.rectangle((int(border["x0"] * self.scale_factor_x),
-                                int(border["y0"] * self.scale_factor_y),
-                                self.shared_data.width - 1, self.shared_data.height - 1), outline=0)
-                for line_key in ("line_top", "line_mid", "line_lower"):
-                    ly = int(self.layout.get(line_key, "y") * self.scale_factor_y)
-                    draw.line((1, ly, self.shared_data.width - 1, ly), fill=0)
-
-                lines = self.shared_data.wrap_text(self.shared_data.bjornsay, self.shared_data.font_arialbold, self.shared_data.width - 4)
-                comment = self.layout.get("comment_text")
-                y_text = int(comment["y_start"] * self.scale_factor_y)
-
-                if self.main_image is not None:
-                    image.paste(self.main_image, (self.shared_data.x_center1, self.shared_data.y_bottom1))
-                else:
-                    logger.error("Main image not found in shared_data.")
-
-                for line in lines:
-                    draw.text((int(comment["x"] * self.scale_factor_x), y_text), line, font=self.shared_data.font_arialbold, fill=0)
-                    y_text += (self.shared_data.font_arialbold.getbbox(line)[3] - self.shared_data.font_arialbold.getbbox(line)[1]) + 3
-
+                self.render_frame(image, draw)
                 if self.screen_reversed:
-                    # DSP-3: the legacy module-level transpose constant is
-                    # deprecated since Pillow 9.1. The enum form is required
-                    # on Pillow 12+.
                     image = image.transpose(Image.Transpose.ROTATE_180)
-
-                # PORT-11: push to hardware only when an EPD is attached.
-                # The screen.png write below always runs so the web UI keeps
-                # updating in headless mode.
                 if self.epd_helper:
                     self.epd_helper.display_partial(image)
                     self.epd_helper.display_partial(image)
-
                 if self.web_screen_reversed:
                     image = image.transpose(Image.Transpose.ROTATE_180)
                 with open(os.path.join(self.shared_data.webdir, "screen.png"), 'wb') as img_file:
                     image.save(img_file)
                     img_file.flush()
                     os.fsync(img_file.fileno())
-                
                 time.sleep(self.shared_data.screen_delay)
             except Exception as e:
                 logger.error(f"An error occurred: {e}")
