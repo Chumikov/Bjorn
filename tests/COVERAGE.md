@@ -5,10 +5,10 @@
 Current gate: `--cov-fail-under=25` (in `pytest.ini`).
 Aspirational target: 50% overall, 70% new code.
 
-## Текущее состояние (v1.4.0)
+## Текущее состояние (v1.5.0)
 
-- Total coverage: **~34.4%**
-- Tests: **352 passing**
+- Total coverage: **~54.4%**
+- Tests: **511 passing**
 
 ## Baseline (start of v1.3.0, after Stage -1 infrastructure setup)
 
