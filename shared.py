@@ -102,7 +102,6 @@ class SharedData:
         self.livestatusfile = os.path.join(self.datadir, 'livestatus.csv')
         # Files directly under vulnerabilities_dir
         self.vuln_summary_file = os.path.join(self.vulnerabilities_dir, 'vulnerability_summary.csv')
-        self.vuln_scan_progress_file = os.path.join(self.vulnerabilities_dir, 'scan_progress.json')
         # Files directly under dictionarydir
         self.usersfile = os.path.join(self.dictionarydir, "users.txt")
         self.passwordsfile = os.path.join(self.dictionarydir, "passwords.txt")
@@ -254,31 +253,6 @@ class SharedData:
         self.initialize_epd_display()
     
 
-    # def initialize_epd_display(self):
-    #     """Initialize the e-paper display."""
-    #     try:
-    #         logger.info("Initializing EPD display...")
-    #         time.sleep(1)
-    #         self.epd_helper = EPDHelper(self.config["epd_type"])
-    #         self.epd_helper = EPDHelper(self.epd_type)
-    #         if self.config["epd_type"] == "epd2in13_V2":
-    #             logger.info("EPD type: epd2in13_V2 screen reversed")
-    #             self.screen_reversed = False
-    #             self.web_screen_reversed = False
-    #         elif self.config["epd_type"] == "epd2in13_V3":
-    #             logger.info("EPD type: epd2in13_V3 screen reversed")
-    #             self.screen_reversed = False
-    #             self.web_screen_reversed = False
-    #         elif self.config["epd_type"] == "epd2in13_V4":
-    #             logger.info("EPD type: epd2in13_V4 screen reversed")
-    #             self.screen_reversed = True
-    #             self.web_screen_reversed = True
-    #         self.epd_helper.init_full_update()
-    #         self.width, self.height = self.epd_helper.epd.width, self.epd_helper.epd.height
-    #         logger.info(f"EPD {self.config['epd_type']} initialized with size: {self.width}x{self.height}")
-    #     except Exception as e:
-    #         logger.error(f"Error initializing EPD display: {e}")
-    #         raise
     def initialize_epd_display(self):
         """Initialize the e-paper display.
 

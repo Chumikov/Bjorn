@@ -78,12 +78,14 @@ function generateConfigForm(config) {
         ];
 
         formData.forEach((value, key) => {
-            // Check if the input from the user contains a `,` character or is a known array field
+            // Check if the input from the user contains a `, character or is a known array field
             if (value.includes(',') || arrayFields.includes(key)) {
-                formDataObj[key] = value.split(',').map(item => {
-                    const trimmedItem = item.trim();
-                    return isNaN(trimmedItem) || trimmedItem == "" ? trimmedItem : parseFloat(trimmedItem);
-                });
+                // BACK-13: filter empty items (trailing/double commas),
+                // use parseInt for numeric items (ports are integers, not floats).
+                formDataObj[key] = value.split(',')
+                    .map(item => item.trim())
+                    .filter(item => item !== '')
+                    .map(item => isNaN(item) ? item : parseInt(item, 10));
             } else {
                 formDataObj[key] = value === 'on' ? true : (isNaN(value) ? value : parseFloat(value));
             }

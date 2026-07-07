@@ -47,7 +47,6 @@ def mock_shared_data(monkeypatch):
     shared_mock.netkbfile = os.path.join(PROJECT_ROOT, 'data', 'netkb.csv')
     shared_mock.livestatusfile = os.path.join(PROJECT_ROOT, 'data', 'livestatus.csv')
     shared_mock.vuln_summary_file = os.path.join(PROJECT_ROOT, 'data', 'output', 'vulnerabilities', 'vulnerability_summary.csv')
-    shared_mock.vuln_scan_progress_file = os.path.join(PROJECT_ROOT, 'data', 'output', 'vulnerabilities', 'scan_progress.json')
     shared_mock.usersfile = os.path.join(PROJECT_ROOT, 'data', 'input', 'dictionary', 'users.txt')
     shared_mock.passwordsfile = os.path.join(PROJECT_ROOT, 'data', 'input', 'dictionary', 'passwords.txt')
     shared_mock.sshfile = os.path.join(PROJECT_ROOT, 'data', 'output', 'crackedpwd', 'ssh.csv')
@@ -73,7 +72,6 @@ def mock_shared_data(monkeypatch):
     sys.modules['init_shared'] = mock_module
 
     mock_epd = MagicMock()
-    sys.modules['epd_helper'] = mock_epd
     sys.modules['epd_manager'] = mock_epd
     sys.modules['resources'] = MagicMock()
     sys.modules['resources.waveshare_epd'] = MagicMock()
@@ -93,7 +91,7 @@ def mock_shared_data(monkeypatch):
 
     yield shared_mock
 
-    for mod in ['init_shared', 'epd_helper', 'epd_manager', 'resources', 'resources.waveshare_epd',
+    for mod in ['init_shared', 'epd_manager', 'resources', 'resources.waveshare_epd',
                 'getmac', 'nmap', 'smb', 'smb.SMBConnection']:
         sys.modules.pop(mod, None)
 

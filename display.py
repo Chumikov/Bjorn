@@ -41,18 +41,6 @@ class Display:
         self.screen_reversed = self.shared_data.screen_reversed
         self.web_screen_reversed = self.shared_data.web_screen_reversed
 
-        # Define frise positions for different display types
-        self.frise_positions = {
-            "epd2in7": {
-                "x": 50,
-                "y": 160
-            },
-            "default": {  # Default position for other display types
-                "x": 0,
-                "y": 160
-            }
-        }
-
         # PORT-3: data-driven layout (replaces hardcoded coordinates in run()).
         self.layout = DisplayLayout(self.shared_data)
 
@@ -81,15 +69,6 @@ class Display:
 
         self.scale_factor_x = self.shared_data.scale_factor_x
         self.scale_factor_y = self.shared_data.scale_factor_y
-
-    def get_frise_position(self):
-        """Get the frise position based on the display type."""
-        display_type = self.config.get("epd_type", "default")
-        position = self.frise_positions.get(display_type, self.frise_positions["default"])
-        return (
-            int(position["x"] * self.scale_factor_x),
-            int(position["y"] * self.scale_factor_y)
-        )
 
     def schedule_update_shared_data(self):
         """Periodically update the shared data with the latest system information."""
