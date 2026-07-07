@@ -88,7 +88,7 @@ sudo journalctl -u bjorn.service --no-pager | tail -50
   Лечится `sudo chmod +x /home/bjorn/Bjorn/kill_port_8000.sh` или
   обновлением до v1.3.2+.
 - `ImportError` / `SyntaxError` → проблема в коде. Обновись до последнего
-  релиза: `cd /home/bjorn/Bjorn && git fetch --tags && git checkout v1.3.4`.
+  релиза: `cd /home/bjorn/Bjorn && git fetch --tags && git checkout v1.5.0`.
 - Сервис не пишет ничего → падает ДО Python, смотри следующий шаг.
 
 **Шаг 2. Проверь последний Bjorn-лог**:
@@ -173,10 +173,10 @@ detection (`/proc/cpuinfo` + `/etc/rpi-issue` + `/proc/device-tree/model`).
 **Причина**: версии до v1.3.4 ссылались на ассеты с избыточным префиксом
 `web/`, который после WEB-2 резолвился в несуществующий двойной путь.
 
-**Fix**: обновиться до v1.3.4:
+**Fix**: обновиться до v1.5.0:
 ```bash
 cd /home/bjorn/Bjorn
-git fetch --tags && git checkout v1.3.4
+git fetch --tags && git checkout v1.5.0
 ```
 
 Проверка: `curl -u admin:bjorn http://[ip]:8000/css/styles.css` должен

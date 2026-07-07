@@ -26,7 +26,7 @@ If applicable, add screenshots to help explain your problem.
 **Hardware / окружение (пожалуйста, заполните):**
 
 - Модель Pi: [напр. Zero W / Zero W2 / RPi 5]
-- Версия Bjorn: [напр. v1.3.4 — `cat version.txt` или `curl -u admin:bjorn http://[ip]:8000/version`]
+- Версия Bjorn: [напр. v1.5.0 — `cat version.txt` или `curl -u admin:bjorn http://[ip]:8000/version`]
 - `epd_type`: [напр. epd2in13_V4]
 - Образ RPi OS: [напр. 2026-04-13-raspios-bookworm-arm64-lite]
 - Версия ядра: [вывод `uname -r`]

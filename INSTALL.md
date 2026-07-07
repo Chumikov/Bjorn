@@ -47,7 +47,7 @@ https://www.raspberrypi.com/software/
     - Версия Debian: 12 (bookworm) '2026-04-13-raspios-bookworm-arm64-lite'
 - Имя пользователя и hostname установлены в `bjorn`.
 - e-Paper HAT 2.13 дюйма подключён к GPIO-пинам.
-- **Минимальная версия Bjorn**: v1.3.1+ (мульти-источник platform detection для BCM2712). Рекомендуется v1.3.4+.
+- **Минимальная версия Bjorn**: v1.5.0+ (мульти-источник platform detection, headless, preview, login).
 
 
 

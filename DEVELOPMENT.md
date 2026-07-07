@@ -352,7 +352,7 @@ pylint <файл_или_директория>
 
 Текущее состояние (v1.5.0): **511 тестов**, покрытие ~54.4% (gate
 `--cov-fail-under=30` в `pytest.ini`). Целевой ориентир — 50% (запланирован
-на v1.4.0 через backfill тестов для `Bjorn.py`, `orchestrator.py`,
+на v1.5.0 через backfill тестов для `Bjorn.py`, `orchestrator.py`,
 `display.py`, `comment.py`).
 
 Важно различать два типа тестов:
@@ -401,7 +401,7 @@ nohup python3 Bjorn.py > /tmp/bjorn_headless.log 2>&1 &
 sleep 5
 
 # 4. Проверки (ожидаемый результат в комментарии):
-curl -s -u admin:bjorn http://127.0.0.1:8000/version                 # {"version":"1.4.0"}
+curl -s -u admin:bjorn http://127.0.0.1:8000/version                 # {"version":"1.5.0"}
 curl -s -o /dev/null -w '%{http_code} %{redirect_url}\n' http://127.0.0.1:8000/   # 302 .../login
 curl -s -i -X POST http://127.0.0.1:8000/login \
    -H 'Content-Type: application/json' \
@@ -450,7 +450,7 @@ Commits (`fix`/`feat`/`docs`/`chore`/`refactor`/`test`) остаётся на
 - ссылки ведут на форк `Chumikov/Bjorn`, а не на upstream `infinition`.
 
 Полный аудит-чеклист и последовательность релиза — в `AGENTS.md` (раздел
-«Release checklist»). История аудита v1.3.4 — пример полного прогона.
+«Release checklist»). История аудита v1.5.0 — пример полного прогона.
 
 ### 🔧 Git executable bit
 
