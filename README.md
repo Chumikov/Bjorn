@@ -3,8 +3,7 @@
   <img src="https://github.com/user-attachments/assets/1b490f07-f28e-4418-8d41-14f1492890c6" alt="bjorn_epd-removebg-preview" width="150">
 </p>
 
-Bjorn — это «тамагочи-подобный» изощрённый автономный сканер сетевой безопасности и инструмент наступательной безопасности, разработанный для работы на Raspberry Pi с e-Paper HAT 2.13 дюйма. Этот документ содержит подробное описание проекта.
-
+Bjorn — это «тамагочи-подобный» изощрённый автономный сканер сетевой безопасности и инструмент наступательной безопасности, разработанный для работы на Raspberry Pi с e-Paper HAT 2.13 дюйма.
 
 ## 📚 Содержание
 
@@ -13,11 +12,10 @@ Bjorn — это «тамагочи-подобный» изощрённый ав
 - [Начало работы](#-начало-работы)
   - [Предварительные требования](#-предварительные-требования)
   - [Установка](#-установка)
-- [Быстрый старт](#-быстрый-старт)
 - [Пример использования](#-пример-использования)
 - [Участие в проекте](#-участие-в-проекте)
-- [Лицензия](#-лицензия)
 - [Контакты](#-контакты)
+- [Лицензия](#-лицензия)
 
 ## 📄 Введение
 
@@ -46,7 +44,7 @@ e-Paper HAT дисплей и веб-интерфейс обеспечивают
     - Стабильная:
       - Система: 32-бит
       - Версия ядра: 6.12
-      - Версия Debian: 12 (bookworm) '2026-04-13-raspios-bookworm-armhf-lite'
+      - Можно использовать как актуальную RPi OS (Trixie), так и Legacy (Bookworm): [raspberrypi.com/software/operating-systems](https://www.raspberrypi.com/software/operating-systems/).
 - Имя пользователя и hostname установлены в `bjorn`.
 - e-Paper HAT 2.13 дюйма подключён к GPIO-пинам.
 
@@ -60,7 +58,7 @@ e-Paper HAT дисплей и веб-интерфейс обеспечивают
     - Стабильная:
       - Система: 64-бит
       - Версия ядра: 6.12
-      - Версия Debian: 12 (bookworm) '2026-04-13-raspios-bookworm-arm64-lite'
+      Можно использовать как актуальную RPi OS (Trixie), так и Legacy (Bookworm): [raspberrypi.com/software/operating-systems](https://www.raspberrypi.com/software/operating-systems/).
 - Имя пользователя и hostname установлены в `bjorn`.
 - e-Paper HAT 2.13 дюйма подключён к GPIO-пинам.
 
@@ -69,14 +67,10 @@ e-Paper HAT дисплей и веб-интерфейс обеспечивают
 - Установленная Raspberry Pi OS (Legacy, 64-bit).
     - Система: 64-bit (ARM64/aarch64; 32-bit не поддерживается на BCM2712)
     - Версия ядра: 6.12
-    - Версия Debian: 12 (bookworm) '2026-04-13-raspios-bookworm-arm64-lite'
+    Можно использовать как актуальную RPi OS (Trixie), так и Legacy (Bookworm): [raspberrypi.com/software/operating-systems](https://www.raspberrypi.com/software/operating-systems/).
 - Имя пользователя и hostname установлены в `bjorn`.
 - e-Paper HAT 2.13 дюйма подключён к GPIO-пинам.
 - **Минимальная версия Bjorn**: v1.5.0+ (мульти-источник platform detection, headless, login, preview).
-
-
-На данный момент протестированы и поддерживаются экраны v2 и v4.
-Надеемся, что V1 и V3 также будут работать корректно.
 
 ### 🔧 Совместимость с оборудованием
 
@@ -86,14 +80,9 @@ e-Paper HAT дисплей и веб-интерфейс обеспечивают
 | RPi Zero W2 (BCM2837) | ✅ | v1.0.0+ |
 | RPi 5 (BCM2712) | ✅ | **v1.5.0+** |
 
-### ✅ Debian Trixie (13)
-
-Начиная с **v1.4.0** Bjorn поддерживает и Bookworm (12), и Trixie (13).
-
-Можно использовать как актуальную RPi OS (Trixie), так и Legacy (Bookworm):
-[raspberrypi.com/software/operating-systems](https://www.raspberrypi.com/software/operating-systems/).
-
 ### 🔨 Установка
+
+⚠️ **Правильная установка происходит только с иностранного IP-адреса** ⚠️
 
 Самый быстрый способ установить Bjorn — использовать скрипт автоматической установки:
 
