@@ -1,5 +1,3 @@
-# <img src="https://github.com/user-attachments/assets/c5eb4cc1-0c3d-497d-9422-1614651a84ab" alt="thumbnail_IMG_0546" width="33"> Bjorn
-
 <p align="center">
   <img src="https://github.com/user-attachments/assets/c5eb4cc1-0c3d-497d-9422-1614651a84ab" alt="thumbnail_IMG_0546" width="150">
   <img src="https://github.com/user-attachments/assets/1b490f07-f28e-4418-8d41-14f1492890c6" alt="bjorn_epd-removebg-preview" width="150">
@@ -38,17 +36,11 @@ e-Paper HAT дисплей и веб-интерфейс обеспечивают
 - **Стабильность**: singleton EPDManager с защитой SPI и авто-recovery, мониторинг здоровья (потоки/RSS/FD), блокировка запуска двух экземпляров.
 - **Поддержка ОС**: Raspberry Pi OS Bookworm (12) и Trixie (13).
 
-<!-- TODO: вставьте своё фото e-Paper HAT в действии сюда. Пример:
-     ![Дисплей Bjorn](docs/images/display-screenshot.png)
-     Оригинальный upstream asset удалён; замените на своё фото после первого запуска. -->
-
 ## 🚀 Начало работы
 
 ## 📌 Предварительные требования
 
 ### 📋 Для RPI zero W (32-бит)
-
-![image](https://github.com/user-attachments/assets/3980ec5f-a8fc-4848-ab25-4356e0529639)
 
 - Установленная Raspberry Pi OS (Legacy, 32-bit).
     - Стабильная:
@@ -90,33 +82,16 @@ e-Paper HAT дисплей и веб-интерфейс обеспечивают
 
 | Плата | Статус | Минимальная версия Bjorn |
 |---|---|---|
-| RPi Zero W (BCM2835) | ✅ Полная поддержка (upstream) | v1.0.0+ |
-| RPi Zero W2 (BCM2837) | ✅ Полная поддержка (upstream) | v1.0.0+ |
-| RPi 5 (BCM2712) | ✅ Поддержка (протестировано в форке) | **v1.5.0+** |
-
-**Важно для RPi 5**: после `apt full-upgrade` на RPi OS Bookworm 2024+
-файл `/proc/cpuinfo` больше не содержит строку "Raspberry". Версии Bjorn
-до v1.3.1 падают на определении платы. Используй v1.5.0+ для
-гарантированной совместимости.
+| RPi Zero W (BCM2835) | ✅ | v1.0.0+ |
+| RPi Zero W2 (BCM2837) | ✅ | v1.0.0+ |
+| RPi 5 (BCM2712) | ✅ | **v1.5.0+** |
 
 ### ✅ Debian Trixie (13)
 
 Начиная с **v1.4.0** Bjorn поддерживает и Bookworm (12), и Trixie (13).
-Раньше установщик падал на `libatlas-base-dev` (пакет удалён в Trixie), но
-после v1.3.0 (DEP-1) numpy убран из зависимостей — pandas 2.x использует
-OpenBLAS (`libopenblas-dev`), и ATLAS больше не нужен. `install_bjorn.sh`
-теперь принимает обе версии ОС (12 и 13).
 
 Можно использовать как актуальную RPi OS (Trixie), так и Legacy (Bookworm):
 [raspberrypi.com/software/operating-systems](https://www.raspberrypi.com/software/operating-systems/).
-
-**Persistent journal рекомендуется** для диагностики crash-loop-ов (по
-умолчанию RPi OS использует volatile journal, который теряет логи между
-перезагрузками):
-```bash
-sudo mkdir -p /var/log/journal
-sudo systemctl restart systemd-journald
-```
 
 ### 🔨 Установка
 
@@ -128,22 +103,6 @@ wget -O install_bjorn.sh https://chumikovsec.ru/install
 sudo chmod +x install_bjorn.sh && sudo ./install_bjorn.sh
 # Выберите вариант 1 для автоматической установки. Это может занять некоторое время, так как будет установлено множество пакетов и модулей. Необходимо выполнить перезагрузку по завершении.
 ```
-
-Подробная информация об **установке** — в [Руководстве по установке](INSTALL.md)
-
-## ⚡ Быстрый старт
-
-**Нужна помощь? Не можете найти IP-адрес Bjorn после установки?**
-Используйте Bjorn Detector & SSH Launcher:
-
-[https://github.com/infinition/bjorn-detector](https://github.com/infinition/bjorn-detector)
-
-![ezgif-1-a310f5fe8f](https://github.com/user-attachments/assets/182f82f0-5c3a-4896-a75e-37b9cfa2263a)
-
-**Всё ещё нужна помощь?**
-Подробная информация об **устранении неполадок** — в [Руководстве по устранению неполадок](TROUBLESHOOTING.md)
-
-**Быстрая установка**: самый быстрый способ установить **Bjorn** — [Начало работы](#-начало-работы)
 
 ## 💡 Пример использования
 
@@ -203,7 +162,7 @@ Bjorn задуман как кузница инструментов, управ�
   - Документируйте шаги воспроизведения.
   - Предоставляйте логи и контекст.
 
-- **Автор**: __infinition__ (оригинал), Chumikov Sec (форк)
+- **Автор**: Chumikov Sec (форк), __infinition__ (оригинал)
 - **GitHub**: [Chumikov/Bjorn](https://github.com/Chumikov/Bjorn) (форк), [infinition/Bjorn](https://github.com/infinition/Bjorn) (upstream)
 
 ---
