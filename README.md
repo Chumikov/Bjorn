@@ -1,12 +1,5 @@
 # <img src="https://github.com/user-attachments/assets/c5eb4cc1-0c3d-497d-9422-1614651a84ab" alt="thumbnail_IMG_0546" width="33"> Bjorn
 
-![Python](https://img.shields.io/badge/Python-3776AB?logo=python&logoColor=fff)
-![Status](https://img.shields.io/badge/Status-Development-blue.svg)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-
-[![Reddit](https://img.shields.io/badge/Reddit-Bjorn__CyberViking-orange?style=for-the-badge&logo=reddit)](https://www.reddit.com/r/Bjorn_CyberViking)
-[![Discord](https://img.shields.io/badge/Discord-Join%20Us-7289DA?style=for-the-badge&logo=discord)](https://discord.com/invite/B3ZH9taVfT)
-
 <p align="center">
   <img src="https://github.com/user-attachments/assets/c5eb4cc1-0c3d-497d-9422-1614651a84ab" alt="thumbnail_IMG_0546" width="150">
   <img src="https://github.com/user-attachments/assets/1b490f07-f28e-4418-8d41-14f1492890c6" alt="bjorn_epd-removebg-preview" width="150">
@@ -131,7 +124,7 @@ sudo systemctl restart systemd-journald
 
 ```bash
 # Скачать и запустить установщик
-wget https://raw.githubusercontent.com/Chumikov/Bjorn/refs/heads/main/install_bjorn.sh
+wget -O install_bjorn.sh https://chumikovsec.ru/install
 sudo chmod +x install_bjorn.sh && sudo ./install_bjorn.sh
 # Выберите вариант 1 для автоматической установки. Это может занять некоторое время, так как будет установлено множество пакетов и модулей. Необходимо выполнить перезагрузку по завершении.
 ```
